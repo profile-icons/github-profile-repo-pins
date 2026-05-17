@@ -133,8 +133,7 @@ class RepoPinImg:
             + str(self.__repo_pin_theme.get(enums.RepoPinsImgThemeMode.DARK))
             + " }"
         )
-        return css + (
-            """text { 
+        return css + ("""text { 
               font-family: -apple-system, 
               BlinkMacSystemFont, 
               "Segoe UI", 
@@ -143,8 +142,7 @@ class RepoPinImg:
               Arial, 
               sans-serif; 
             } 
-          </style>"""
-        )
+          </style>""")
 
     def __char_width(self, char: str, font_px: float) -> float:
         return font_px * (
@@ -875,7 +873,7 @@ def tst_svg_render(
 
     GenerateRepoPins.update_themes()  # update the database with any new json themes not in enums.RepoPinsImgThemeName
 
-    tst_input: list[dict[str, str | int | bool | dict[str, str]]] = [
+    tst_input = [
         {
             enums.RepoPinsResDictKeys.NAME.value: "readme-repo-pins",
             enums.RepoPinsResDictKeys.STARS.value: 110_000,
@@ -900,6 +898,7 @@ def tst_svg_render(
             "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
             "culpa qui officia deserunt mollit anim id est laborum.",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/profile-icons/readme-repo-pins",
+            enums.RepoPinsResDictKeys.URL_CUSTOM.value: "https://github.com/FALSE/FALSE",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {
                 enums.RepoPinsResDictKeys.NAME.value: "MATLAB",
                 enums.RepoPinsResDictKeys.COLOR.value: "#e16737",
@@ -952,7 +951,8 @@ def tst_svg_render(
             },
             enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
             "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            enums.RepoPinsResDictKeys.URL.value: f"https://github.com/{test_username}/{test_username}",
+            enums.RepoPinsResDictKeys.URL.value: "https://github.com/FALSE/FALSE",
+            enums.RepoPinsResDictKeys.URL_CUSTOM.value: f"https://github.com/{test_username}/{test_username}",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {
                 enums.RepoPinsResDictKeys.NAME.value: "Python",
                 enums.RepoPinsResDictKeys.COLOR.value: "#3572A5",
@@ -984,6 +984,7 @@ def tst_svg_render(
             },
             enums.RepoPinsResDictKeys.DESCRIPTION.value: "",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/profile-icons/readme-repo-pins",
+            enums.RepoPinsResDictKeys.URL_CUSTOM.value: "",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {},
             enums.RepoPinsResDictKeys.IS_FORK.value: False,
             enums.RepoPinsResDictKeys.PARENT.value: {},

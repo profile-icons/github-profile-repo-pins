@@ -86,6 +86,7 @@ class RepoPinsResDictKeys(Enum):
     RATE_LIMIT = "rateLimit"
     COST = "cost"
     URL = "url"
+    URL_CUSTOM = "homepageUrl"
     USER = "user"
     VIEWER = "viewer"
     NAME = "name"
