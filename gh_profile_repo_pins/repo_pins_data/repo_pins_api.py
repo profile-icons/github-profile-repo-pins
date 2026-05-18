@@ -46,6 +46,7 @@ class GitHubApiClient:
       pushedAt
       createdAt
       updatedAt
+      homepageUrl
     """
     __GRAPH_QL_RATE_LIMIT_STR: str = """
       rateLimit { cost }
@@ -166,8 +167,8 @@ class GitHubApiClient:
         self, res: Response, exception: type[BaseException] = GitHubGraphQlClientError
     ) -> None:
         raise exception(
-            f"{(res.json().get(enums.RepoPinsResDictKeys.ERROR.value) or {})
-            .get(enums.RepoPinsResDictKeys.MESSAGE.value)
+            f"{((res.json().get(enums.RepoPinsResDictKeys.ERROR.value) or {})
+            .get(enums.RepoPinsResDictKeys.MESSAGE.value))
             if res.json().get(enums.RepoPinsResDictKeys.ERROR.value)
             else (
                 res.json().get(enums.RepoPinsResDictKeys.ERROR.value,[])[0]

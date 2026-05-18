@@ -167,8 +167,19 @@ class RepoPinImgData:
                     repo_data.get(enums.RepoPinsResDictKeys.IS_PRIVATE.value, False)
                     or False
                 )
-                else cls.repo_pages_url(
-                    url=repo_data.get(enums.RepoPinsResDictKeys.URL.value, "") or ""
+                else (
+                    str(
+                        repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value, "")
+                    ).strip()
+                    if urlparse(
+                        str(
+                            repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value)
+                        ).strip()
+                    ).scheme
+                    == "https"
+                    else cls.repo_pages_url(
+                        url=repo_data.get(enums.RepoPinsResDictKeys.URL.value, "") or ""
+                    )
                 )
             ),
             primary_language_name=primary_language_dict.get(
