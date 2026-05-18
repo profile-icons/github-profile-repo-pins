@@ -169,7 +169,13 @@ class RepoPinImgData:
                 )
                 else (
                     repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value, "")
-                    or cls.repo_pages_url(
+                    if urlparse(
+                        str(
+                            repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value)
+                        ).strip()
+                    ).scheme
+                    == "https"
+                    else cls.repo_pages_url(
                         url=repo_data.get(enums.RepoPinsResDictKeys.URL.value, "") or ""
                     )
                 )

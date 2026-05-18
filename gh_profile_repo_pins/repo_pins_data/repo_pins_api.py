@@ -166,8 +166,9 @@ class GitHubApiClient:
     def __raise_api_fetch_err(
         self, res: Response, exception: type[BaseException] = GitHubGraphQlClientError
     ) -> None:
-        raise exception(f"{(res.json().get(enums.RepoPinsResDictKeys.ERROR.value) or {})
-            .get(enums.RepoPinsResDictKeys.MESSAGE.value)
+        raise exception(
+            f"{((res.json().get(enums.RepoPinsResDictKeys.ERROR.value) or {})
+            .get(enums.RepoPinsResDictKeys.MESSAGE.value))
             if res.json().get(enums.RepoPinsResDictKeys.ERROR.value)
             else (
                 res.json().get(enums.RepoPinsResDictKeys.ERROR.value,[])[0]
@@ -179,7 +180,8 @@ class GitHubApiClient:
                     if res.json().get(enums.RepoPinsResDictKeys.MESSAGE.value) 
                     else "Bad credentials"
                 )
-            )}")
+            )}"
+        )
 
     def __update_fetch_cost(self, res_json: dict = None) -> None:
         with self.__fetch_cost_update_lock:
