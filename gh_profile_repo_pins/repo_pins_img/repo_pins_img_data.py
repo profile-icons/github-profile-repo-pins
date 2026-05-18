@@ -168,7 +168,9 @@ class RepoPinImgData:
                     or False
                 )
                 else (
-                    str(repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value, "")).strip()
+                    str(
+                        repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value, "")
+                    ).strip()
                     if urlparse(
                         str(
                             repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value)
