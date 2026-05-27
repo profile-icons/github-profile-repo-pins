@@ -125,17 +125,15 @@ class RepoPinImg:
         )
 
     def __theme_style_block(self) -> str | AttributeError:
-        css: str = ("""
+        css: str = """
           <style>
             svg {
               background: transparent;
             }
-            """ + str(self.__repo_pin_theme.get(enums.RepoPinsImgThemeMode.LIGHT)))
-        css += (
-            """
+            """ + str(self.__repo_pin_theme.get(enums.RepoPinsImgThemeMode.LIGHT))
+        css += """
             @media (prefers-color-scheme: dark) {
             """ + str(self.__repo_pin_theme.get(enums.RepoPinsImgThemeMode.DARK)) + "}"
-        )
         return css + ("""
             text { 
               font-family: -apple-system, 
