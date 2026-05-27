@@ -14,9 +14,9 @@ class ThemeSVG:
 
     def __repr__(self) -> str:
         return f""":root {{
-          --canvas: {self.canvas}; --border: {self.border}; 
-          --text: {self.text}; --danger: {self.danger}; --link: {self.link};
-        }}"""
+              --canvas: {self.canvas}; --border: {self.border}; 
+              --text: {self.text}; --danger: {self.danger}; --link: {self.link};
+            }}"""
 
 
 class RepoPinImgTheme:
