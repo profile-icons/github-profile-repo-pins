@@ -55,7 +55,7 @@ jobs:
   * name the new repository `Repository name*` identical to the `owner*` name.
   * select the green `Create Repository` button.
 
-> The [template repo](https://github.com/profile-icons/readme-repo-pins) (and generated copies) execute the source code in this repo.
+> The [template repo](https://github.com/profile-icons/readme-repo-pins-template) (and generated copies) execute the source code in this repo.
 
 The source code creates a profile with frequently updated repo pins using CI automation and a placeholder:
 
