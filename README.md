@@ -32,7 +32,7 @@ jobs:
   update-pins:
     runs-on: ubuntu-latest
     steps:
-      - uses: profile-icons/readme-repo-pins-src@v1
+      - uses: profile-icons/readme-repo-pins@v1
         with:
           gh_api_token: ${{ secrets.GH_API_TOKEN || secrets.GITHUB_TOKEN }}  # required, uses default fallback
           gh_username: ${{ secrets.GH_USERNAME || github.repository_owner }}  # required, uses default fallback
@@ -47,11 +47,11 @@ jobs:
  
 ```
 
-> The workflow execute the [action.yml](https://github.com/profile-icons/readme-repo-pins-src/blob/main/action.yml) and source code in this repo.
+> The workflow execute the [action.yml](https://github.com/profile-icons/readme-repo-pins/blob/main/action.yml) and source code in this repo.
 
 ### Template Profile
 
-* Simply create a copy of the template repository by clicking [here](https://github.com/new?template_name=readme-repo-pins&template_owner=profile-icons)
+* Simply create a copy of the template repository by clicking [here](https://github.com/new?template_name=readme-repo-pins-template&template_owner=profile-icons)
   * name the new repository `Repository name*` identical to the `owner*` name.
   * select the green `Create Repository` button.
 
@@ -91,7 +91,7 @@ where:
 * `owner/repo` matches the owner/repository names in the URL of a given repository - required `<>`
 * `theme_name` matches any key in `files/themes.json` - required `<>`
 
-> If a theme is unavailable, you can add it to `files/themes.json` - refer [here](https://github.com/profile-icons/readme-repo-pins-src/issues/1) for more information.
+> If a theme is unavailable, you can add it to `files/themes.json` - refer [here](https://github.com/profile-icons/readme-repo-pins/issues/1) for more information.
 
 > The default `THEME` is `github_soft`
 
