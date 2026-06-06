@@ -98,7 +98,6 @@ class ReadMeRepoPins:
         self.__user_repo_owner: str = (
             repo_owner if repo_owner else self.__gh_api_client.username
         )
-        self.__is_org: bool = self.__gh_api_client.is_org(repo_owner)
 
         self.__is_contribution_stats: bool = is_contribution_stats
         self.__repo_stats: RepoPinStats | None = (
