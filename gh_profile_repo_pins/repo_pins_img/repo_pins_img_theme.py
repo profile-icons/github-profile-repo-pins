@@ -47,7 +47,7 @@ class RepoPinImgTheme:
                 msg=f"Theme '{theme_name.value}' is not found in the database."
             )
 
-        self.__svg_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] = (
+        self.__svg_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] | None = (
             svg_themes_db.get(
                 enums.RepoPinsImgThemeName(theme_name),
                 svg_themes_db.get(theme_name),
@@ -63,5 +63,5 @@ class RepoPinImgTheme:
             )
 
     @property
-    def svg_theme(self) -> dict[enums.RepoPinsImgThemeMode, ThemeSVG]:
+    def svg_theme(self) -> dict[enums.RepoPinsImgThemeMode, ThemeSVG] | None:
         return self.__svg_theme

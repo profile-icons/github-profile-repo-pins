@@ -24,21 +24,21 @@ class ReadMeRepoPins:
     def __init__(
         self,
         api_token: str,
-        username: str = None,
-        repo_names_exclusive: str = None,
-        theme: str | dict = None,
-        bg_img: dict | str = None,
-        max_num_pins: int = None,
-        repo_priority_order: str = None,
+        username: str | None = None,
+        repo_names_exclusive: str | None = None,
+        theme: str | dict | None = None,
+        bg_img: dict | str | None = None,
+        max_num_pins: int | None = None,
+        repo_priority_order: str | None = None,
         is_exclude_repos_owned: bool = False,
         is_exclude_repos_contributed: bool = False,
-        repo_owner: str = None,
+        repo_owner: str | None = None,
         is_contribution_stats: bool = False,
     ) -> None:
         self.__log: Logger = get_logger()
         try:
             self.__gh_api_client: GitHubApiClient = GitHubApiClient(
-                api_token=api_token, username=username
+                api_token=api_token, username=username, repo_owner=repo_owner
             )
         except GitHubGraphQlClientError as err:
             self.__log.error(msg=err.msg)
@@ -49,14 +49,14 @@ class ReadMeRepoPins:
             user_id=self.__gh_api_client.user_id,
         )
         self.__repo_pins: list[dict] = list()
-        self.__theme: str | dict = theme
+        self.__theme: str | dict | None = theme
         self.__bg_img: dict | str | None = bg_img
 
         # optional, exclusive list of repos with high priority over other optional configs
         self.__repo_names_exclusive: list[str] = (
             [r.strip() for r in repo_names_exclusive.split(",") if r.strip() != ""]
             if repo_names_exclusive
-            else None
+            else []
         )
 
         # optional, default overruled if self.__repo_names_exclusive is not None
@@ -98,9 +98,10 @@ class ReadMeRepoPins:
         self.__user_repo_owner: str = (
             repo_owner if repo_owner else self.__gh_api_client.username
         )
+        self.__is_org: bool = self.__gh_api_client.is_org(repo_owner)
 
         self.__is_contribution_stats: bool = is_contribution_stats
-        self.__repo_stats: RepoPinStats = (
+        self.__repo_stats: RepoPinStats | None = (
             RepoPinStats(gh_token=api_token) if self.__is_contribution_stats else None
         )
 
@@ -158,6 +159,7 @@ class ReadMeRepoPins:
             login_username=self.__gh_api_client.username.strip().lower(),
             login_user_name=self.__gh_api_client.user_name.strip().lower(),
             login_user_id=self.__gh_api_client.user_id,
+            is_org=self.__gh_api_client.is_org,
             theme=self.__theme,
             bg_img=self.__bg_img,
         )

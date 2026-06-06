@@ -41,17 +41,17 @@ runs:
   using: "composite"
   steps:
     - name: Checkout repo
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         token: ${{ inputs.gh_api_token }}
         fetch-depth: 0
 
     - name: Checkout src
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
-        repository: profile-icons/readme-repo-pins-src
+        repository: profile-icons/readme-repo-pins
         ref: main
-        path: readme-repo-pins-src
+        path: readme-repo-pins
         fetch-depth: 1
 
     - name: Setup

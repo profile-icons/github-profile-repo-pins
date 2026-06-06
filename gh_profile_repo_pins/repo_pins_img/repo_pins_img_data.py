@@ -19,13 +19,13 @@ class RepoPinImgData:
     url: str
     primary_language_name: str
     primary_language_color: str
-    is_fork: bool
-    parent: str
+    is_fork: bool | str
+    parent: str | None
     is_template: bool
     is_archived: bool
     is_private: bool
     theme: enums.RepoPinsImgThemeName
-    bg_img: RepoPinImgMedia
+    bg_img: RepoPinImgMedia | None
     user_img: RepoPinImgMedia
 
     @classmethod
@@ -47,9 +47,11 @@ class RepoPinImgData:
         user_repo_owner: str,
         login_username: str,
         login_user_name: str,
-        login_user_id: int,
-        theme_name: enums.RepoPinsImgThemeName = enums.RepoPinsImgThemeName.GITHUB_SOFT,
-        bg_img: dict | str = None,
+        login_user_id: int | None,
+        theme_name: (
+            enums.RepoPinsImgThemeName | None
+        ) = enums.RepoPinsImgThemeName.GITHUB_SOFT,
+        bg_img: dict | str | None = None,
     ) -> "RepoPinImgData":
         repo_owner = (
             repo_data.get(enums.RepoPinsResDictKeys.URL.value, "").split("/")[-2]

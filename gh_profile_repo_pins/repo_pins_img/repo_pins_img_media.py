@@ -23,12 +23,13 @@ class RepoPinImgMedia:
 
     def __init__(
         self,
-        img: str = None,
+        img: str | None = None,
         align: str = __DEFAULT_ALIGN,
         mode: str = __DEFAULT_MODE,
         opacity: float = __DEFAULT_OPACITY,
     ) -> None:
-        self.__img: bytes | str = img
+        assert img
+        self.__img = img
         self.__img_mime: enums.RepoPinsImgMediaImgMime = (
             enums.RepoPinsImgMediaImgMime.PNG
         )
@@ -42,7 +43,7 @@ class RepoPinImgMedia:
             if mode
             else enums.RepoPinsImgMediaImgMode(self.__DEFAULT_MODE.lower())
         )
-        self.__img_opacity: float = (
+        self.__img_opacity: float | int = (
             opacity
             if opacity is not None and 0.0 <= opacity <= 1.0
             else self.__DEFAULT_OPACITY
@@ -141,7 +142,7 @@ class RepoPinImgMedia:
         return self.__img_mode
 
     @property
-    def opacity(self) -> float:
+    def opacity(self) -> float | int:
         return self.__img_opacity
 
     @property

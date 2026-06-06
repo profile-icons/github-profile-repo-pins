@@ -114,6 +114,9 @@ class RepoPinsResDictKeys(Enum):
     DB_ID = "databaseId"
     EMAIL = "email"
     AUTHOR = "author"
+    REPOSITORY_OWNER = "repositoryOwner"
+    TYPENAME = "__typename"
+    ORGANIZATION = "organization"
 
 
 def update_enum(enum_cls: type[Enum], enum_dict: dict[str, str]) -> None:

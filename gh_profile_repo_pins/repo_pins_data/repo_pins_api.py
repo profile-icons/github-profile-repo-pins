@@ -22,6 +22,7 @@ class GitHubCredentialData:
     user_name: str
     user_id: int
     account_creation: str
+    is_org: bool = False
 
 
 class GitHubApiClient:
@@ -133,13 +134,25 @@ class GitHubApiClient:
       }}
     }}
     """
+    __GRAPH_QL_REPO_OWNER_TYPE_QUERY: str = f"""
+    query ($login: String!) {{
+      {__GRAPH_QL_RATE_LIMIT_STR}
+      repositoryOwner(login: $login) {{
+        __typename
+      }}
+    }}
+    """
     __DEFAULT_TIME_OUT: int = 10
     __DEFAULT_FETCH_LIMIT: int = 100
 
     __MAX_WORKERS: int = 8
 
     def __init__(
-        self, api_token: str, username: str = None, fetch_limit: int = None
+        self,
+        api_token: str,
+        username: str | None = None,
+        repo_owner: str | None = None,
+        fetch_limit: int | None = None,
     ) -> None:
         self.__local_thread: local = local()
 
@@ -162,6 +175,11 @@ class GitHubApiClient:
             )
         except AssertionError as err:
             raise GitHubGraphQlClientError(msg=f"API authorization error: {err}")
+
+        self.__gh_config_data.is_org = (
+            self.__get_repo_owner_type(repo_owner=repo_owner)
+            == enums.RepoPinsResDictKeys.ORGANIZATION.value
+        )
 
     def __raise_api_fetch_err(
         self, res: Response, exception: type[BaseException] = GitHubGraphQlClientError
@@ -236,7 +254,7 @@ class GitHubApiClient:
             raise GitHubGraphQlClientError(msg=f"API request error: {err}")
 
     def __get_user_config(self, username: str) -> tuple[str, int, str]:
-        res: dict[str, str | list[str]] = self.__post_request(
+        res: dict[str, str | list[str]] | None = self.__post_request(
             body_json={
                 "query": self.__GRAPH_QL_USER_DATA_QUERY,
                 "variables": {enums.RepoPinsResDictKeys.LOGIN.value: username},
@@ -263,8 +281,8 @@ class GitHubApiClient:
             ).get(enums.RepoPinsResDictKeys.CREATED_AT.value, ""),
         )
 
-    def __verify_user(self, username: str = None) -> tuple[str, str, int, str]:
-        res: dict[str, str | list[str]] = self.__post_request(
+    def __verify_user(self, username: str | None = None) -> tuple[str, str, int, str]:
+        res: dict[str, str | list[str]] | None = self.__post_request(
             body_json={"query": self.__GRAPH_QL_VERIFY_TOKEN_QUERY}
         )
         res_username: str = (
@@ -281,10 +299,31 @@ class GitHubApiClient:
             username = res_username
         return (username, *self.__get_user_config(username=username))
 
+    def __get_repo_owner_type(self, repo_owner: str | None) -> str:
+        assert repo_owner
+        res: dict[str, str | list[str]] | None = self.__post_request(
+            body_json={
+                "query": self.__GRAPH_QL_REPO_OWNER_TYPE_QUERY,
+                "variables": {enums.RepoPinsResDictKeys.LOGIN.value: repo_owner},
+            }
+        )
+        res_repo_owner_type: str = (
+            (
+                (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
+                    enums.RepoPinsResDictKeys.REPOSITORY_OWNER.value
+                )
+                or {}
+            )
+            .get(enums.RepoPinsResDictKeys.TYPENAME.value, "")
+            .strip()
+            .lower()
+        )
+        return res_repo_owner_type
+
     def __process_repo_req(
         self, body_json: dict, repo_data_key: str, is_user_data: bool = True
     ) -> dict:
-        res_data: dict = (
+        res_data = (
             self.__post_request(body_json=body_json).get(
                 enums.RepoPinsResDictKeys.DATA.value
             )
@@ -424,6 +463,10 @@ class GitHubApiClient:
         return self.__gh_config_data.username
 
     @property
+    def is_org(self) -> bool:
+        return self.__gh_config_data.is_org
+
+    @property
     def fetch_cost(self) -> int:
         return self.__fetch_cost_ttl
 
@@ -444,10 +487,10 @@ class GitHubApiClient:
 
     def fetch_owned_or_contributed_to_repo_data(
         self,
-        order_field: enums.RepositoryOrderFieldEnum = None,
-        pinned_repo_urls: list[str] = None,
+        order_field: enums.RepositoryOrderFieldEnum | None = None,
+        pinned_repo_urls: list[str] | None = None,
         is_contributed: bool = False,
-    ) -> list[dict[str, str | int | dict | list]]:
+    ) -> list[dict[str, str | int | dict]]:
         return self.__paginate_fetch_repo_data(
             body_json={
                 "query": (

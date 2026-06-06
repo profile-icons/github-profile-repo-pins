@@ -19,7 +19,7 @@ GH_API_TOKEN: str = environ.get(
 )  # use default fine-grain PAT if local &/or for increased rate limit
 
 REPO_OWNER: str = environ.get(
-    "GH_REPO_OWNER", ""
+"GH_REPO_OWNER", ""
 )  # repo_owner is for repo code executed from/for, username is auth
 
 # optional, can be a string (for all repos), or a dict (for individual repos) in the following format:
@@ -94,9 +94,7 @@ def parse_bg_img(bg_img: str) -> dict | str | None:
     return bg_img
 
 
-def parse_args() -> (
-    tuple[str, str, str, str | dict, dict | str, int, str, bool, bool, str, bool]
-):
+def parse_args() -> tuple:
     parser = ArgumentParser(
         description="GitHub API-fetch pinned/popular/contributed/select/etc repositories for a given username"
     )
@@ -236,7 +234,7 @@ def parse_args() -> (
     )
 
 
-def tst_svg_parse_args() -> tuple[str, str, int, dict | str]:
+def tst_svg_parse_args() -> tuple:
     parser = ArgumentParser(description="Local test pin themes and SVG rendering.")
     parser.add_argument(
         "--theme",
@@ -283,7 +281,7 @@ def get_logger() -> Logger:
     return logger
 
 
-def set_git_creds(user_name: str, user_id: int) -> None:
+def set_git_creds(user_name: str, user_id: int | None) -> None:
     if getenv("GITHUB_ENV"):
         with open(file=getenv("GITHUB_ENV"), mode="a") as gh_env_file:
             gh_env_file.write(f"GH_USER_NAME={user_name}\n")
@@ -305,7 +303,7 @@ def load_themes() -> dict[str, dict[str, dict[str, str]]]:
         return load(themes_file)
 
 
-def load_img(img_path: str) -> bytes | None:
+def load_img(img_path: str) -> bytes | str:
     with open(
         file=get_path(path_str=img_path), mode="rb"
     ) as img_file:  # fix for local repo
@@ -335,10 +333,12 @@ def write_svg(svg_obj_str: str, file_name: str) -> None:
         svg_file.write(svg_obj_str)
 
 
-def get_md_grid_pin_str(file_num: int, repo_name: str, repo_url: str) -> str:
+def get_md_grid_pin_str(
+    file_num: int, repo_name: str, repo_url: str, is_org: bool = False
+) -> str:
     imgs_path: str = IMGS_DIR
-    if not Path("README.md").exists():
-        imgs_path = f"../{imgs_path}"  # try org profile README.md
+    if is_org:
+        imgs_path = f"../{imgs_path}"
     grid_str: str = ""
     if file_num % 2 == 0:
         grid_str += "\n"
@@ -357,10 +357,12 @@ def get_html_grid_pin_str(file_num: int) -> str:
     )
 
 
-def update_md_file(update_pin_display_str: str, is_index_md: bool = False) -> None:
+def update_md_file(
+    update_pin_display_str: str, is_index_md: bool = False, is_org: bool = False
+) -> None:
     md_file_path: Path = Path("README.md" if not is_index_md else "index.md")
-    if not md_file_path.exists() and not is_index_md:
-        md_file_path = Path("profile/README.md")  # try org profile README.md
+    if not is_index_md and is_org:
+        md_file_path = Path("profile/README.md")  # use profile/README.md if org
     if md_file_path.exists():
         update_data: str = sub(
             pattern=r"(<!-- START: REPO-PINS -->)(.*?)(<!-- END: REPO-PINS -->)",

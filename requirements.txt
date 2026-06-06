@@ -3,5 +3,5 @@ langdetect~=1.0.9
 requests~=2.34.2
 cairosvg~=2.9.0
 Pillow~=12.2.0
-black~=26.5.0
-ruff~=0.15.13
+black~=26.5.1
+ruff~=0.15.16

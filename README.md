@@ -84,7 +84,7 @@ The optional `THEME` configuration controls the visual color scheme of the gener
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 * key: `THEME`
 * value (either one of the two formats):
-  * `{<owner/repo>: <theme_name>}` - individual pin theme(s)
+  * `{<owner/repo>: <theme_name>,...,<owner/repo>: <theme_name>}` - individual pin theme(s)
   * `<theme_name>` - single theme for pin(s)
 
 where:
@@ -102,7 +102,7 @@ The optional `BG_IMG` configuration controls the embedding of select imagery to 
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 * key: `BG_IMG`
 * value (either one of the three formats):
-  * `{<owner/repo>: <img-config-dict>}` - individual pin background image(s)
+  * `{<owner/repo>: <img-config-dict>,...,<owner/repo>: <img-config-dict>}` - individual pin background image(s)
   * `<img-config-dict>` - single background image for pin(s)
   * `<url/filepath>` - single background image for pin(s)
 

@@ -9,17 +9,17 @@ import gh_profile_repo_pins.repo_pins_enum as enums
 
 class RepoPinImg:
 
-    __SCALE: float = 0.937
-    __WIDTH: float = round(440 * __SCALE)
-    __HEIGHT: float = round(143 * __SCALE)
+    __SCALE: float | int = 0.937
+    __WIDTH: float | int = round(440 * __SCALE)
+    __HEIGHT: float | int = round(143 * __SCALE)
     __BASE_PADDING: int = 17
-    __PADDING: float = round(__BASE_PADDING * __SCALE)
-    __ROUNDING: float = round(6 * __SCALE)
-    __NAME_SIZE: float = 14 * __SCALE
+    __PADDING: float | int = round(__BASE_PADDING * __SCALE)
+    __ROUNDING: float | int = round(6 * __SCALE)
+    __NAME_SIZE: float | int = 14 * __SCALE
     __NAME_WEIGHT: int = 500
-    __META_SIZE: float = 13 * __SCALE
-    __DESC_SIZE: float = 13 * __SCALE
-    __DESC_LINE_H: float = 1.35 * __DESC_SIZE
+    __META_SIZE: float | int = 13 * __SCALE
+    __DESC_SIZE: float | int = 13 * __SCALE
+    __DESC_LINE_H: float | int = 1.35 * __DESC_SIZE
 
     __ICON_REPO: str = (
         "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 "
@@ -146,7 +146,7 @@ class RepoPinImg:
             } 
           </style>""")
 
-    def __char_width(self, char: str, font_px: float) -> float:
+    def __char_width(self, char: str, font_px: float | int) -> float | int:
         return font_px * (
             0.68
             if char in self.__WIDE_CHARS
@@ -155,13 +155,13 @@ class RepoPinImg:
             )
         )
 
-    def __measure(self, txt: str, font_px: float) -> float:
+    def __measure(self, txt: str, font_px: float | int) -> float | int:
         if not txt:
             return 0.0
-        ttl: float = sum(self.__char_width(c, font_px) for c in txt)
+        ttl: float | int = sum(self.__char_width(c, font_px) for c in txt)
         return max(0.0, ttl - min(ttl * 0.08, max(0, len(txt) - 1) * (0.02 * font_px)))
 
-    def __truncate_to_width(self, txt: str, max_w: float) -> str:
+    def __truncate_to_width(self, txt: str, max_w: float | int) -> str:
         if self.__measure(txt=txt, font_px=self.__NAME_SIZE) <= max_w:
             return txt
 
@@ -171,7 +171,7 @@ class RepoPinImg:
 
         start, end = 0, len(txt)
         while start < end:
-            mid: float = (start + end + 1) // 2
+            mid: float | int = (start + end + 1) // 2
             if self.__measure(txt=txt[:mid] + ell, font_px=self.__NAME_SIZE) <= max_w:
                 start = mid
             else:
@@ -187,10 +187,10 @@ class RepoPinImg:
         self.__svg_str += "</a>"
 
     def __repo_name(
-        self, header_y: float, name_badge_gap: float, badge_w: float
+        self, header_y: float | int, name_badge_gap: float | int, badge_w: float | int
     ) -> None:
-        name_x: float = self.__PADDING + round(18 * self.__SCALE)
-        max_name_w: float = (
+        name_x: float | int = self.__PADDING + round(18 * self.__SCALE)
+        max_name_w: float | int = (
             (self.__WIDTH - self.__PADDING)
             - name_x
             - name_badge_gap
@@ -219,8 +219,8 @@ class RepoPinImg:
         self.__href_link_close()
 
     def __badge_layout(
-        self, header_y: float
-    ) -> tuple[float, float, float, float, float, str]:
+        self, header_y: float | int
+    ) -> tuple[float | int, float | int, float | int, float | int, float | int, str]:
         badge_txt: str = (
             self.__BADGE_PRIVATE
             if self.__repo_pin_data.is_private
@@ -230,23 +230,23 @@ class RepoPinImg:
             if self.__repo_pin_data.is_archived
             else (self.__BADGE_TEMPLATE if self.__repo_pin_data.is_template else "")
         )
-        badge_font_size: float = self.__NAME_SIZE * 0.7
-        badge_w: float = (
+        badge_font_size: float | int = self.__NAME_SIZE * 0.7
+        badge_w: float | int = (
             int(round(self.__measure(txt=badge_txt, font_px=badge_font_size) + 0.5))
             + self.__PADDING
         )
-        badge_h: float = round(badge_font_size + self.__ROUNDING * 1.1)
-        badge_x: float = (self.__WIDTH - self.__PADDING) - badge_w
-        badge_y: float = header_y - (badge_h * 0.8)
+        badge_h: float | int = round(badge_font_size + self.__ROUNDING * 1.1)
+        badge_x: float | int = (self.__WIDTH - self.__PADDING) - badge_w
+        badge_y: float | int = header_y - (badge_h * 0.8)
         return badge_x, badge_y, badge_h, badge_w, badge_font_size, badge_txt
 
     def __badge(
         self,
-        badge_x: float,
-        badge_y: float,
-        badge_h: float,
-        font_size: float,
-        badge_w: float,
+        badge_x: float | int,
+        badge_y: float | int,
+        badge_h: float | int,
+        font_size: float | int,
+        badge_w: float | int,
         badge_txt: str,
     ) -> str:
         return (
@@ -270,11 +270,11 @@ class RepoPinImg:
 
     def __badge_multi_lang(
         self,
-        badge_x: float,
-        badge_y: float,
-        badge_h: float,
-        font_size: float,
-        badge_w: float,
+        badge_x: float | int,
+        badge_y: float | int,
+        badge_h: float | int,
+        font_size: float | int,
+        badge_w: float | int,
         badge_txt: str,
     ) -> str:
         svg_switch: str = "<switch>"
@@ -303,12 +303,12 @@ class RepoPinImg:
         svg_switch += "</g></switch>"
         return svg_switch
 
-    def __header(self, header_y: float) -> None:
+    def __header(self, header_y: float | int) -> None:
         badge_x, badge_y, badge_h, badge_w, badge_font_size, badge_txt = (
             self.__badge_layout(header_y=header_y)
         )
 
-        name_badge_gap: float = round(self.__NAME_SIZE * 0.6)
+        name_badge_gap: float | int = round(self.__NAME_SIZE * 0.6)
         self.__repo_name(
             header_y=header_y, name_badge_gap=name_badge_gap, badge_w=badge_w
         )
@@ -323,7 +323,10 @@ class RepoPinImg:
         )
 
     def __wrap_lines(
-        self, description_txt: str, max_width_px: float, area_height_px: float
+        self,
+        description_txt: str,
+        max_width_px: float | int,
+        area_height_px: float | int,
     ) -> list[str]:
         if not description_txt or (area_height_px - self.__DESC_SIZE) < -1e-6:
             return []
@@ -403,7 +406,10 @@ class RepoPinImg:
         pass  # TODO
 
     def __description(
-        self, description_txt: str, description_y: float, description_h: float
+        self,
+        description_txt: str,
+        description_y: float | int,
+        description_h: float | int,
     ) -> str:
         wrapped_description_lines: list[str] = self.__wrap_lines(
             description_txt=description_txt,
@@ -426,7 +432,10 @@ class RepoPinImg:
         return svg_txt
 
     def __description_multi_lang(
-        self, description_txt: str, description_y: float, description_h: float
+        self,
+        description_txt: str,
+        description_y: float | int,
+        description_h: float | int,
     ) -> str:
         multi_lang_descriptions: dict[str, str] = (
             self.__repo_pin_translator.translate_all(input_txt=description_txt)
@@ -449,7 +458,7 @@ class RepoPinImg:
         svg_switch += "</g></switch>"
         return svg_switch
 
-    def __body(self, body_y: float, body_h: float) -> None:
+    def __body(self, body_y: float | int, body_h: float | int) -> None:
         if self.__repo_pin_data.is_fork and self.__repo_pin_data.parent:
             self.__parent_repo()  # TODO
         if self.__repo_pin_data.description:
@@ -459,7 +468,9 @@ class RepoPinImg:
                 description_h=body_h,
             )
 
-    def __render_icon(self, path_d: str, x: float, y: float, size: float) -> str:
+    def __render_icon(
+        self, path_d: str, x: float | int, y: float | int, size: float | int
+    ) -> str:
         return (
             f"<g "
             f'transform="translate({x:.2f},{y:.2f}) '
@@ -485,16 +496,16 @@ class RepoPinImg:
         self,
         stats_icons: list[str],
         stats_count: int,
-        footer_x: float,
-        footer_y: float,
-        footer_h: float,
+        footer_x: float | int,
+        footer_y: float | int,
+        footer_h: float | int,
         is_collab_icon: bool = False,
-    ) -> float:
+    ) -> float | int:
         if stats_count <= 0:
             return footer_x
 
         txt: str = self.__fmt_footer_stats_str(stats_count=stats_count)
-        txt_w: float = self.__measure(txt=txt, font_px=self.__META_SIZE)
+        txt_w: float | int = self.__measure(txt=txt, font_px=self.__META_SIZE)
         self.__svg_str += (
             f"<g>"
             f"<rect "
@@ -529,8 +540,12 @@ class RepoPinImg:
         return footer_x + txt_w + self.__PADDING + self.__META_SIZE
 
     def __footer_txt(
-        self, txt: str, txt_x: float, footer_y: float, fill: str = "var(--text)"
-    ) -> float:
+        self,
+        txt: str,
+        txt_x: float | int,
+        footer_y: float | int,
+        fill: str = "var(--text)",
+    ) -> float | int:
         self.__svg_str += (
             f"<text "
             f'x="{txt_x}" '
@@ -545,8 +560,10 @@ class RepoPinImg:
             txt_x + self.__measure(txt=txt, font_px=self.__META_SIZE) + self.__PADDING
         )
 
-    def __footer_primary_language(self, footer_y: float, footer_h: float) -> float:
-        circle_cx: float = self.__PADDING + self.__ROUNDING
+    def __footer_primary_language(
+        self, footer_y: float | int, footer_h: float | int
+    ) -> float | int:
+        circle_cx: float | int = self.__PADDING + self.__ROUNDING
         self.__svg_str += (
             f"<circle "
             f'cx="{circle_cx}" '
@@ -556,7 +573,7 @@ class RepoPinImg:
             f"/>"
         )
 
-        txt_x: float = circle_cx + (self.__ROUNDING * 2)
+        txt_x: float | int = circle_cx + (self.__ROUNDING * 2)
         return self.__footer_txt(
             txt=self.__repo_pin_data.primary_language_name,
             txt_x=txt_x,
@@ -564,8 +581,8 @@ class RepoPinImg:
         )
 
     def __footer_stargazers(
-        self, footer_x: float, footer_y: float, footer_h: float
-    ) -> float:
+        self, footer_x: float | int, footer_y: float | int, footer_h: float | int
+    ) -> float | int:
         self.__href_link_open(
             url=self.__repo_pin_data.url,
             url_path=(
@@ -583,8 +600,8 @@ class RepoPinImg:
         return footer_x
 
     def __footer_forks(
-        self, footer_x: float, footer_y: float, footer_h: float
-    ) -> float:
+        self, footer_x: float | int, footer_y: float | int, footer_h: float | int
+    ) -> float | int:
         self.__href_link_open(
             url=self.__repo_pin_data.url,
             url_path=(
@@ -602,8 +619,8 @@ class RepoPinImg:
         return footer_x
 
     def __footer_issues(
-        self, footer_x: float, footer_y: float, footer_h: float
-    ) -> float:
+        self, footer_x: float | int, footer_y: float | int, footer_h: float | int
+    ) -> float | int:
         self.__href_link_open(
             url=self.__repo_pin_data.url,
             url_path=(
@@ -630,8 +647,8 @@ class RepoPinImg:
         return footer_x
 
     def __footer_pull_requests(
-        self, footer_x: float, footer_y: float, footer_h: float
-    ) -> float:
+        self, footer_x: float | int, footer_y: float | int, footer_h: float | int
+    ) -> float | int:
         self.__href_link_open(
             url=self.__repo_pin_data.url,
             url_path=(
@@ -648,9 +665,9 @@ class RepoPinImg:
         self.__href_link_close()
         return footer_x
 
-    def __contribution_img(self, footer_x: float, footer_y: float) -> None:
+    def __contribution_img(self, footer_x: float | int, footer_y: float | int) -> None:
         self.__repo_pin_data.user_img.load()
-        img_radius: float = self.__META_SIZE / 2
+        img_radius: float | int = self.__META_SIZE / 2
         self.__svg_str += (
             "<defs>"
             f'<clipPath id="avatarClip">'
@@ -670,8 +687,8 @@ class RepoPinImg:
         )
 
     def __footer_contributors(
-        self, footer_x: float, footer_y: float, footer_h: float
-    ) -> float:
+        self, footer_x: float | int, footer_y: float | int, footer_h: float | int
+    ) -> float | int:
         self.__href_link_open(
             url=self.__repo_pin_data.url,
             url_path=(
@@ -724,8 +741,8 @@ class RepoPinImg:
         self.__href_link_close()
         return footer_x
 
-    def __footer(self, footer_y: float, footer_h: float) -> None:
-        footer_x: float = self.__PADDING
+    def __footer(self, footer_y: float | int, footer_h: float | int) -> None:
+        footer_x: float | int = self.__PADDING
         if self.__repo_pin_data.primary_language_name:
             footer_x = self.__footer_primary_language(
                 footer_y=footer_y, footer_h=footer_h
@@ -765,11 +782,11 @@ class RepoPinImg:
         )
 
     def __render_svg(self) -> None:
-        header_y: float = self.__PADDING + self.__NAME_SIZE
-        body_y: float = header_y + self.__PADDING
-        body_h: float = max(0.0, self.__HEIGHT - self.__PADDING - body_y)
-        footer_y: float = max(0.0, self.__HEIGHT - self.__PADDING)
-        footer_h: float = self.__META_SIZE
+        header_y: float | int = self.__PADDING + self.__NAME_SIZE
+        body_y: float | int = header_y + self.__PADDING
+        body_h: float | int = max(0.0, self.__HEIGHT - self.__PADDING - body_y)
+        footer_y: float | int = max(0.0, self.__HEIGHT - self.__PADDING)
+        footer_h: float | int = self.__META_SIZE
 
         repo_icon: list[str] = (
             [self.__ICON_REPO_PRIVATE_INNER, self.__ICON_REPO_PRIVATE_OUTER]
@@ -864,7 +881,7 @@ def tst_svg_render(
     test_theme_name: str = "github_soft",
     test_username: str = "R055A",
     test_user_id: int = 14985050,
-    test_bg_img: dict | str = None,
+    test_bg_img: dict | str | None = None,
 ) -> None:
     from gh_profile_repo_pins.repo_pins_exceptions import (
         RepoPinImageThemeError,

@@ -75,7 +75,7 @@ class RepoPinStats:
             ]
         )
 
-    def __format_author_email_str(self, author_str: str) -> tuple[str, str]:
+    def __format_author_email_str(self, author_str: str) -> tuple[str, str | None]:
         author_email: list[str] = author_str.lower().split(self.__EMAIL_OPEN_BRACKET)
         return author_email[0].strip(), (
             author_email[1].strip().rstrip(">").strip()
@@ -103,7 +103,7 @@ class RepoPinStats:
             if not commit_data or not commit_data.stdout:
                 return []
 
-            commit_authors_emails: list[tuple[str, str]] = []
+            commit_authors_emails: list[tuple[str, str | None]] = []
             for commit_line in commit_data.stdout.splitlines():
                 if self.__AUTHOR_REG.fullmatch(string=commit_line):
                     commit_authors_emails = [

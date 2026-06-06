@@ -20,11 +20,13 @@ class GenerateRepoPins:
         user_repo_owner: str,
         login_username: str,
         login_user_name: str,
-        login_user_id: int,
-        theme: str | dict,
-        bg_img: dict | str = None,
+        login_user_id: int | None,
+        is_org: bool,
+        theme: str | dict | None,
+        bg_img: dict | str | None = None,
     ) -> None:
         self.update_themes()  # update the database with any new json themes not in enums.RepoPinsImgThemeName
+        self.__is_org: bool = is_org
 
         try:
             self.__repo_pins: list[RepoPinImgData] = [
@@ -109,6 +111,7 @@ class GenerateRepoPins:
                     file_num=i,
                     repo_name=repo_data.repo_name,
                     repo_url=repo_data.url,
+                    is_org=self.__is_org,
                 )
                 if is_md_str
                 else get_html_grid_pin_str(file_num=i)
@@ -124,7 +127,9 @@ class GenerateRepoPins:
 
     def grid_display(self) -> None:
         self.__render_repo_pin_imgs()
-        update_md_file(update_pin_display_str=self.__build_grid())
+        update_md_file(update_pin_display_str=self.__build_grid(), is_org=self.__is_org)
         update_md_file(
-            update_pin_display_str=self.__build_grid(is_md_str=False), is_index_md=True
+            update_pin_display_str=self.__build_grid(is_md_str=False),
+            is_index_md=True,
+            is_org=self.__is_org,
         )
