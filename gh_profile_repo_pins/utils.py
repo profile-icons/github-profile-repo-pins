@@ -19,7 +19,7 @@ GH_API_TOKEN: str = environ.get(
 )  # use default fine-grain PAT if local &/or for increased rate limit
 
 REPO_OWNER: str = environ.get(
-"GH_REPO_OWNER", ""
+    "GH_REPO_OWNER", ""
 )  # repo_owner is for repo code executed from/for, username is auth
 
 # optional, can be a string (for all repos), or a dict (for individual repos) in the following format:
