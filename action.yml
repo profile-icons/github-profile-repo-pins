@@ -49,9 +49,9 @@ runs:
     - name: Checkout src
       uses: actions/checkout@v6
       with:
-        repository: profile-icons/readme-repo-pins
+        repository: profile-icons/readme-repo-pins-src
         ref: main
-        path: readme-repo-pins
+        path: readme-repo-pins-src
         fetch-depth: 1
 
     - name: Setup
@@ -65,7 +65,7 @@ runs:
         PIP_DISABLE_PIP_VERSION_CHECK: '1'
       run: |
         python -m pip install --upgrade pip
-        pip install -r readme-repo-pins/requirements.txt
+        pip install -r readme-repo-pins-src/requirements.txt
 
     - name: Run
       shell: bash
@@ -82,7 +82,7 @@ runs:
         IS_EXCLUDE_REPOS_CONTRIBUTED: ${{ inputs.is_exclude_repos_contributed }}
         IS_CONTRIBUTION_STATS: ${{ inputs.is_contribution_stats }}
       run: |
-        python readme-repo-pins/gh_profile_repo_pins.py
+        python readme-repo-pins-src/gh_profile_repo_pins.py
 
     - name: Commit
       shell: bash
