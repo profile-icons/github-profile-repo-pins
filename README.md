@@ -8,8 +8,10 @@ Pins can be customized by repo selection, stats, order, background image (URL or
 
 > Repository data is fetched from GitHub API. Contribution data is scraped from commit logs.
 
-![example-1](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/0.svg) 
-![example-2](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/1.svg)
+[![example-1](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/0.svg)](https://github.com/R055A/R055A) 
+[![example-2](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/1.svg)](https://github.com/R055A/R055A)    
+[![example-3](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/2.svg)](https://github.com/R055A/R055A) 
+[![example-4](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/3.svg)](https://github.com/R055A/R055A) 
 
 ## Instructions
 
