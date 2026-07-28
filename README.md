@@ -1,23 +1,27 @@
 # GitHub Profile Repository Pins
 
-Personalize selection, visualization and dynamic ordering of repository pins for public and private GitHub profiles.  
-No PAT required, just copy the [workflow](#actions-workflow) or repo [template](#template-profile) for efficient data fetching and visualization rendering.  
-Supports multi-language displaying of private and public repository pins for both user and organisation profiles.  
-Supports profile website deployment for full utilization of the frequently updated repository pin visualization features.  
-Pins can be customized by repo selection, stats, order, background image (URL or path), and available themes.
+Design & display any public & private repository pin visualizations for GitHub user & organization profiles with i18n auto-translations, images, themes, dynamic ordering & optional statistics support.
 
-> Repository data is fetched from GitHub API. Contribution data is scraped from commit logs.
+Pin visualizations can be customized by any repository selection, dynamic ordering, background imagery (URL or path), and themes.
+
+Pin visualizations for private repositories automatically link to deployed public Pages if the link is set to the repository.
+
+Pin visualization detect browser language and automatically translate to multiple languages - may require refreshing browser cache.
+
+Integrate with GitHub Pages deployed profile sites. A demonstration is found here: [https://r055a.github.io/r055a](https://r055a.github.io/r055a)
 
 [![example-1](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/0.svg)](https://github.com/R055A/R055A) 
-[![example-2](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/1.svg)](https://github.com/R055A/R055A)    
+[![example-2](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/1.svg)](https://github.com/R055A/R055A)   
 [![example-3](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/2.svg)](https://github.com/R055A/R055A) 
 [![example-4](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/3.svg)](https://github.com/R055A/R055A) 
 
 ## Instructions
 
+Basic, instant setup for default public repository pin visualizations. No PAT required. Secrets are only required for displaying pins for private repositories and certain customization.
+
 ### Actions Workflow
 
-Copy the workflow `<workflow>.yml` to `.github/workflows/` in a user/org profile repository:
+Copy the workflow to `.github/workflows/<workflow>.yaml` in a user/organization profile repository:
 
 ```yaml
 name: generate-profile-repo-pins
