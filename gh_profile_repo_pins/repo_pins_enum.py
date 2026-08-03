@@ -71,7 +71,13 @@ class RepoPinsImgThemeName(Enum):
     GITHUB = "github"
     GITHUB_SOFT = "github_soft"
     BG_IMG_CONTRAST = "bg_img_contrast"
+    CATPPUCCIN = "catppuccin"
     DRACULA = "dracula"
+    GRUVBOX = "gruvbox"
+    NORD = "nord"
+    ONE_DARK = "one_dark"
+    SOLARIZED = "solarized"
+    TOKYO_NIGHT = "tokyo_night"
 
 
 class RepoPinsImgThemeMode(Enum):
