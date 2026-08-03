@@ -347,22 +347,8 @@ def get_md_grid_pin_str(
     )
 
 
-def get_html_grid_pin_str(file_num: int) -> str:
-    grid_str: str = ""
-    if file_num % 2 == 0:
-        grid_str += "\n"
-    return (
-        grid_str
-        + f'<object type="image/svg+xml" data="{IMGS_DIR}/{file_num}.svg"></object> '
-    )
-
-
-def update_md_file(
-    update_pin_display_str: str, is_index_md: bool = False, is_org: bool = False
-) -> None:
-    md_file_path: Path = Path("README.md" if not is_index_md else "index.md")
-    if not is_index_md and is_org:
-        md_file_path = Path("profile/README.md")  # use profile/README.md if org
+def update_md_file(update_pin_display_str: str, is_org: bool = False) -> None:
+    md_file_path: Path = Path("profile/README.md" if is_org else "README.md")
     if md_file_path.exists():
         update_data: str = sub(
             pattern=r"(<!-- START: REPO-PINS -->)(.*?)(<!-- END: REPO-PINS -->)",

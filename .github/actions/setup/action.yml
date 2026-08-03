@@ -4,7 +4,7 @@ description: Reusable action for setting up a Python environment with pip requir
 inputs:
   py-version:
     description: Python version
-    default: '3.13'
+    default: '3.14'
 
   pip-requirements:
     description: Pip requirements path
@@ -14,7 +14,7 @@ runs:
   using: composite
 
   steps:
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: ${{ inputs.py-version }}
 

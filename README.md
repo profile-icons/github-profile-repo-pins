@@ -1,27 +1,21 @@
 # GitHub Profile Repository Pins
 
-Design & display any public & private repository pin visualizations for GitHub user & organization profiles with i18n auto-translations, images, themes, dynamic ordering & optional statistics support.
+Design & display any public & private repository pin visualizations for GitHub user & organization profiles with:
 
-Pin visualizations can be customized by any repository selection, dynamic ordering, background imagery (URL or path), and themes.
+* custom dynamic ordering
+* custom selection of any public and (authorized) private repository
+* custom themes - select from [existing](https://github.com/profile-icons/readme-repo-pins/blob/main/files/themes.json), or [create your own](https://github.com/profile-icons/readme-repo-pins/issues/1)
+* custom background imagery - URL or filepath
+* automatic i18n translations to match browser language - may require cache refresh
+* (optional) user contribution statistics 
 
-Pin visualizations for private repositories automatically link to deployed public Pages if the link is set to the repository.
+Pins for private repositories automatically link to deployed public Pages if the link is set to the repository.
 
-Pin visualization detect browser language and automatically translate to multiple languages - may require refreshing browser cache.
-
-Integrate with GitHub Pages deployed profile sites. A demonstration is found here: [https://r055a.github.io/r055a](https://r055a.github.io/r055a)
-
-[![example-1](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/0.svg)](https://github.com/R055A/R055A) 
-[![example-2](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/1.svg)](https://github.com/R055A/R055A)   
-[![example-3](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/2.svg)](https://github.com/R055A/R055A) 
-[![example-4](https://raw.githubusercontent.com/R055A/R055A/refs/heads/main/imgs/3.svg)](https://github.com/R055A/R055A) 
+Pins can be used with deployed GitHub profile sites. A demo is found here: [https://r055a.github.io/r055a](https://r055a.github.io/r055a)
 
 ## Instructions
 
-Basic, instant setup for default public repository pin visualizations. No PAT required. Secrets are only required for displaying pins for private repositories and certain customization.
-
-### Actions Workflow
-
-Copy the workflow to `.github/workflows/<workflow>.yaml` in a user/organization profile repository:
+Copy the workflow to `.github/workflows/<workflow>.yml` in a user or organization profile repo - no PAT required:
 
 ```yaml
 name: generate-profile-repo-pins
@@ -40,8 +34,8 @@ jobs:
     steps:
       - uses: profile-icons/readme-repo-pins@v1
         with:
-          gh_api_token: ${{ secrets.GH_API_TOKEN || secrets.GITHUB_TOKEN }}  # required, uses default fallback
-          gh_username: ${{ secrets.GH_USERNAME || github.repository_owner }}  # required, uses default fallback
+          gh_api_token: ${{ secrets.GH_API_TOKEN || secrets.GITHUB_TOKEN }}  # default fallback
+          gh_username: ${{ secrets.GH_USERNAME || github.repository_owner }}  # default fallback
           theme: ${{ secrets.THEME }}  # optional
           background_image: ${{ secrets.BG_IMG }}  # optional
           num_repo_pins: ${{ secrets.NUM_REPO_PINS }}  # optional
@@ -53,30 +47,14 @@ jobs:
  
 ```
 
-> The workflow execute the [action.yml](https://github.com/profile-icons/readme-repo-pins/blob/main/action.yml) and source code in this repo.
-
-### Template Profile
-
-* Simply create a copy of the template repository by clicking [here](https://github.com/new?template_name=readme-repo-pins-template&template_owner=profile-icons)
-  * name the new repository `Repository name*` identical to the `owner*` name.
-  * select the green `Create Repository` button.
-
-> The [template repo](https://github.com/profile-icons/readme-repo-pins-template) (and generated copies) execute the source code in this repo.
-
-The source code creates a profile with frequently updated repo pins using CI automation and a placeholder:
+Insert the following placeholder into the repository `README.md` where you want the pins to render on your profile:
 
 ```
 <!-- START: REPO-PINS -->
 <!-- END: REPO-PINS -->
 ```
 
-If you want an auto-updated GitHub profile, ensure the placeholder is in a `README.md` file.  
-If you want a GitHub Pages profile, ensure the placeholder is in an `index.md` file.
-The files should be located in:
-  * `/` root directory for GitHub user profile and GitHub Pages profile
-  * `/profile` directory for a GitHub organisation profile.  
-
-There is no further setup requirement aside for optional configurations.
+Activate the Actions workflow if not started automatically when pushing these changes to the profile repository.
 
 ## Configurations (optional)
 

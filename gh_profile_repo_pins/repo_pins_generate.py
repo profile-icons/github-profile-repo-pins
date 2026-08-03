@@ -4,7 +4,6 @@ from gh_profile_repo_pins.utils import (
     update_md_file,
     load_themes,
     get_md_grid_pin_str,
-    get_html_grid_pin_str,
 )
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_data import RepoPinImgData
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageThemeError
@@ -103,18 +102,14 @@ class GenerateRepoPins:
             repo_pin_img.render()
             write_svg(svg_obj_str=repo_pin_img.svg, file_name=str(i))
 
-    def __build_grid(self, is_md_str: bool = True) -> str:
+    def __build_grid(self) -> str:
         grid_str: str = ""
         for i, repo_data in enumerate(self.__repo_pins):
-            grid_str += (
-                get_md_grid_pin_str(
-                    file_num=i,
-                    repo_name=repo_data.repo_name,
-                    repo_url=repo_data.url,
-                    is_org=self.__is_org,
-                )
-                if is_md_str
-                else get_html_grid_pin_str(file_num=i)
+            grid_str += get_md_grid_pin_str(
+                file_num=i,
+                repo_name=repo_data.repo_name,
+                repo_url=repo_data.url,
+                is_org=self.__is_org,
             )
         return grid_str
 
@@ -128,8 +123,3 @@ class GenerateRepoPins:
     def grid_display(self) -> None:
         self.__render_repo_pin_imgs()
         update_md_file(update_pin_display_str=self.__build_grid(), is_org=self.__is_org)
-        update_md_file(
-            update_pin_display_str=self.__build_grid(is_md_str=False),
-            is_index_md=True,
-            is_org=self.__is_org,
-        )

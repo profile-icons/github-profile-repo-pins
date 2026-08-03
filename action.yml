@@ -7,47 +7,47 @@ branding:
 
 inputs:
   gh_api_token:
-    description: "GitHub PAT. Required for org profiles and private repo pins, but not for user profiles and public repo pins with workflow default: secrets.GITHUB_TOKEN."
+    description: "GitHub PAT. Default: `secrets.GITHUB_TOKEN`. Non-default PAT required for private repos & org profiles."
     required: true
   gh_username:
-    description: "GitHub username. Required for org, but not for user profiles with workflow default: github.repository_owner."
+    description: "GitHub username. Default: `github.repository_owner`. Non-default username required for org profiles."
     required: true
   theme:
-    description: "Theme name. Default is github_soft. Add themes at: profile-icons/readme-repo-pins."
+    description: "Theme name. Default is `github_soft`. Find & add themes at: profile-icons/readme-repo-pins."
     required: false
   background_image:
     description: "Background image (URL or file path)."
     required: false
   repo_names_exclusive:
-    description: "Exclusive list of repositories (owner/repo) to render pins only for, separated by commas."
+    description: "Exclusive list of repositories (owner/repo) pins are rendered only for, separated by commas."
     required: false
   is_contribution_stats:
-    description: "Include user contribution statistics (percentage). True (any input) or False (empty). Default False."
+    description: "Include user contribution statistics (percentage). True or False (empty). Default: `False`."
     required: false
   num_repo_pins:
-    description: "Number of pins to render (capped at 100). Default is 6 or the number of repo_names_exclusive."
+    description: "Number of pins to render (capped at 100). Default is `6` or the number of `repo_names_exclusive`."
     required: false
   repo_pin_order:
-    description: "The order of repo pins displayed. Default is stargazer count."
+    description: "The order of repo pins displayed. Default is `stargazer` count in descending order."
     required: false
   is_exclude_repos_owned:
-    description: "Exclude owned repos not pinned. True (any input) or False (empty). Overridden by repo_names_exclusive."
+    description: "Exclude owned repositories not pinned. True or False (empty). Overridden by `repo_names_exclusive`."
     required: false
   is_exclude_repos_contributed:
-    description: "Exclude contributed repos not owned or pinned. True (any input) or False (empty). Overridden by repo_names_exclusive."
+    description: "Exclude contributed repos not pinned. True or False (empty). Overridden by `repo_names_exclusive`."
     required: false
 
 runs:
   using: "composite"
   steps:
     - name: Checkout repo
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         token: ${{ inputs.gh_api_token }}
         fetch-depth: 0
 
     - name: Checkout src
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         repository: profile-icons/readme-repo-pins-src
         ref: main
@@ -55,9 +55,9 @@ runs:
         fetch-depth: 1
 
     - name: Setup
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
-        python-version: '3.13'
+        python-version: '3.14'
 
     - name: Install
       shell: bash
