@@ -15,10 +15,12 @@ Pins can be used with deployed GitHub profile sites. A demo is found here: [http
 
 ## Instructions
 
-Copy the workflow to `.github/workflows/<workflow>.yml` in a user or organization profile repo - no PAT required:
+### Workflow
+
+Copy the workflow to `.github/workflows/gen-repo-pins.yml` in a user (no PAT required) or organization profile repo:
 
 ```yaml
-name: generate-profile-repo-pins
+name: gen-repo-pins
 
 on:
   schedule:
@@ -47,21 +49,61 @@ jobs:
  
 ```
 
-Insert the following placeholder into the repository `README.md` where you want the pins to render on your profile:
+### README
 
-```
+Insert the following placeholder into the repository profile `README.md` where you want the pins to render:
+
+```markdown
 <!-- START: REPO-PINS -->
 <!-- END: REPO-PINS -->
 ```
-
-Activate the Actions workflow if not started automatically when pushing these changes to the profile repository.
 
 ## Configurations (optional)
 
 The repository project was initially created to streamline the display of generated pin visualizations on a 
 private profile `README.md`, but supports broader use cases with optional personalization and elevation of API privileges.
 
-### Theme
+<details>
+<summary>API Token</summary>
+
+The optional `GH_API_TOKEN` configuration is for elevating GitHub GraphQL API privileges with a [personal access token (PAT)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
+The default [rate limit](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api) when not using a GitHub PAT is 1000 query points per hour and is limited to public repository data. 
+The rate limit when using a PAT is increased to 5000, and provides access to authorized private repository data so that pins can be generated for both
+public and private repositories to both public and private profiles.
+
+This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+
+* key: `GH_API_TOKEN`
+* value: `[PAT]`
+
+where:
+* `PAT` is a GitHub personal access token and can be generated [here](https://github.com/settings/tokens) - optional `[]`
+
+> The default `GH_API_TOKEN` is `GITHUB_TOKEN` (1000 GraphQL API query points per hour)
+
+> A `PAT` is required for displaying private repository pins
+</details>
+
+<details>
+<summary>Username</summary>
+
+The optional `GH_USERNAME` configuration controls which (pinned/owned/contributed to) repositories are displayed by association.
+
+This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+
+* key: `GH_USERNAME`
+* value: `[username]`
+
+where:
+* `username` must match the username associated with repositories pinned/owned/contributed to by the user the pin display focuses on - optional `[]`
+
+> The default `GH_USERNAME` is `github.repository_owner` (the username associated with the owner of the repo)
+
+> `GH_USERNAME` is required for displaying pins on an organisation profile
+</details>
+
+<details>
+<summary>Theme</summary>
 
 The optional `THEME` configuration controls the visual color scheme of the generated SVG pin background, border, text, and icon features.
 
@@ -79,7 +121,23 @@ where:
 
 > The default `THEME` is `github_soft`
 
-### Background Image
+#### Examples
+
+Either, `{<owner/repo>: <theme_name>,...,<owner/repo>: <theme_name>}` for individual repo pins:
+
+```text
+"{"r055a/r055a": "github_soft","profile-icons/readme-repo-pins": "dracula"}"
+```
+
+or, `<theme_name>` for all generated repo pins:
+
+```text
+"github_soft"
+```
+</details>
+
+<details>
+<summary>Background Image</summary>
 
 The optional `BG_IMG` configuration controls the embedding of select imagery to the background of the generated SVG pin(s).
 
@@ -108,54 +166,41 @@ where:
 
 > The default `BG_IMG` is `None` (which defaults to the `THEME` background color)
 
-### Repository List
+#### Examples
 
-The optional `REPO_NAMES_EXCLUSIVE` configuration controls the exclusive generation of pins for a given list of repository names.
+Either, `{<owner/repo>: <img-config-dict>,...,<owner/repo>: <img-config-dict>}` for individual repo pins:
 
-This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+```text
+"{"r055a/r055a": {"img": "https://eg-url.com"},"profile-icons/readme-repo-pins": {"img": "./imgs/eg-path.png"}}"
+```
 
-* key: `REPO_NAMES_EXCLUSIVE`
-* value: `<owner/repo>,...,<owner/repo>`
+and with optional `{"align": [align], "mode": [mode], "opacity": [opacity]}`
 
-where:
-* `owner/repo` matches the owner/repository names in the URL of a given repository - required `<>`
-* `<owner/repo>,...,<owner/repo>` is a list of any number of `owner/repo` separated by commas `,`
+```text
+"{"r055a/r055a": {"img": "https://eg-url.com", "align": [align], "mode": [mode], "opacity": [opacity]}"
+```
 
-### Contribution Stats
+or, `img-config-dict` for all generated repo pins:
 
-The optional `IS_CONTRIBUTION_STATS` configuration controls whether a (user) contribution percentage is appended to 
-the repository contributor count in the pin footer, enclosed in parentheses, such as: ![ICON](https://raw.githubusercontent.com/primer/octicons/refs/heads/main/icons/people-16.svg) 22 (99.9%).
+```text
+{"img": "./imgs/eg-path.png", "align": [align], "mode": [mode], "opacity": [opacity]}"
+```
 
-This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+or, background image URL for all generated repo pins:
 
-* key: `IS_CONTRIBUTION_STATS`
-* value: `[is_stats]`
+```text
+"https://eg-url.com"
+```
 
-where:
-* `is_stats` is either `true` (any value) or `false` (empty) - optional `[]`
+or, background image path for all generated repo pins:
 
-> The default `IS_CONTRIBUTION_STATS` is `false`
+```text
+"./imgs/eg-path.png"
+```
+</details>
 
-### API Token
-
-The optional `GH_API_TOKEN` configuration is for elevating GitHub GraphQL API privileges with a [personal access token (PAT)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-The default [rate limit](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api) when not using a GitHub PAT is 1000 query points per hour and is limited to public repository data. 
-The rate limit when using a PAT is increased to 5000, and provides access to authorized private repository data so that pins can be generated for both
-public and private repositories to both public and private profiles.
-
-This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
-
-* key: `GH_API_TOKEN`
-* value: `[PAT]`
-
-where:
-* `PAT` is a GitHub personal access token and can be generated [here](https://github.com/settings/tokens) - optional `[]`
-
-> The default `GH_API_TOKEN` is `GITHUB_TOKEN` (1000 GraphQL API query points per hour)
-
-> A `PAT` is required for displaying private repository pins
-
-### Number
+<details>
+<summary>Number</summary>
 
 The optional `NUM_REPO_PINS` configuration controls the maximum possible numb[README.md](README.md)er of repository pins to generate up to a hard limit of `100`.
 
@@ -170,8 +215,10 @@ where:
 > The default `NUM_REPO_PINS` is `6`
 
 > Overruled by the `REPO_NAMES_EXCLUSIVE` configuration when default, or the minimum value between both when also set.
+</details>
 
-### Order
+<details>
+<summary>Order</summary>
 
 The optional `REPO_PIN_ORDER` configuration controls the dynamic ordering of generated repository pin visualizations.
 
@@ -192,8 +239,31 @@ where:
 > The default `REPO_PIN_ORDER` is `STARGAZERS`
 
 > Overruled by the `REPO_NAMES_EXCLUSIVE` configuration when default, but not when also set.
+</details>
 
-### Exclude Owned Repositories (Not Pinned)
+<details>
+<summary>Repository List</summary>
+
+The optional `REPO_NAMES_EXCLUSIVE` configuration controls the exclusive generation of pins for a given list of repository names.
+
+This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+
+* key: `REPO_NAMES_EXCLUSIVE`
+* value: `<owner/repo>,...,<owner/repo>`
+
+where:
+* `owner/repo` matches the owner/repository names in the URL of a given repository - required `<>`
+* `<owner/repo>,...,<owner/repo>` is a list of any number of `owner/repo` separated by commas `,`
+
+#### Examples
+
+```text
+"r055a/r055a,profile-icons/readme-repo-pins,profile-icons/github-stats-modified"
+```
+</details>
+
+<details>
+<summary>Exclude Owned Repositories (Not Pinned)</summary>
 
 By default, repository data collected for generating pin visualizations is first those pinned by a user, followed by
 other repositories owned by the user, and then other repositories the user has contributed to but does not own.
@@ -211,8 +281,10 @@ where:
 > The default `IS_EXCLUDE_REPOS_OWNED` is `false`
 
 > Overruled by the `REPO_NAMES_EXCLUSIVE` configuration, as pin visuals are generated only for listed repositories.
+</details>
 
-### Exclude Contributed Repositories (Neither Owned Nor Pinned)
+<details>
+<summary>Exclude Contributed Repositories (Neither Owned Nor Pinned)</summary>
 
 By default, repository data collected for generating pin visualizations is first those pinned by a user, followed by
 other repositories owned by the user, and then other repositories the user has contributed to but does not own.
@@ -230,19 +302,21 @@ where:
 > The default `IS_EXCLUDE_REPOS_CONTRIBUTED` is `false`
 
 > Overruled by the `REPO_NAMES_EXCLUSIVE` configuration, as pin visuals are generated only for listed repositories.
+</details>
 
-### Username
+<details>
+<summary>Contribution Stats</summary>
 
-The optional `GH_USERNAME` configuration controls which (pinned/owned/contributed to) repositories are displayed by association.
+The optional `IS_CONTRIBUTION_STATS` configuration controls whether a (user) contribution percentage is appended to 
+the repository contributor count in the pin footer, enclosed in parentheses, such as: ![ICON](https://raw.githubusercontent.com/primer/octicons/refs/heads/main/icons/people-16.svg) 22 (99.9%).
 
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 
-* key: `GH_USERNAME`
-* value: `[username]`
+* key: `IS_CONTRIBUTION_STATS`
+* value: `[is_stats]`
 
 where:
-* `username` must match the username associated with repositories pinned/owned/contributed to by the user the pin display focuses on - optional `[]`
+* `is_stats` is either `true` (any value) or `false` (empty) - optional `[]`
 
-> The default `GH_USERNAME` is `github.repository_owner` (the username associated with the owner of the repo)
-
-> `GH_USERNAME` is required for displaying pins on an organisation profile
+> The default `IS_CONTRIBUTION_STATS` is `false`
+</details>
