@@ -109,7 +109,6 @@ class GenerateRepoPins:
                 file_num=i,
                 repo_name=repo_data.repo_name,
                 repo_url=repo_data.url,
-                is_org=self.__is_org,
             )
         return grid_str
 

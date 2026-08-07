@@ -11,7 +11,13 @@ from re import compile
 
 SRC_REPO_NAME: str = "readme-repo-pins-src"
 FILES_DIR: str = "files"
-IMGS_DIR: str = "imgs"
+IMGS_DIR: str = "repo_pin_imgs"
+PROFILE_MD_FILE: str = "README.md"
+ORG_PROFILE_DIR: str = "profile/"
+MD_PLACEHOLDER_START: str = "<!-- START: REPO-PINS -->"
+MD_PLACEHOLDER_END: str = "<!-- END: REPO-PINS -->"
+
+TARGET_REPO_NAME: str = environ.get("GH_REPO_NAME", "")
 
 USERNAME: str = environ.get("GH_USERNAME", "")
 GH_API_TOKEN: str = environ.get(
@@ -281,7 +287,7 @@ def get_logger() -> Logger:
     return logger
 
 
-def set_git_creds(user_name: str, user_id: int | None) -> None:
+def set_git_creds(user_name: str, user_id: int) -> None:
     if getenv("GITHUB_ENV"):
         with open(file=getenv("GITHUB_ENV"), mode="a") as gh_env_file:
             gh_env_file.write(f"GH_USER_NAME={user_name}\n")
@@ -333,25 +339,23 @@ def write_svg(svg_obj_str: str, file_name: str) -> None:
         svg_file.write(svg_obj_str)
 
 
-def get_md_grid_pin_str(
-    file_num: int, repo_name: str, repo_url: str, is_org: bool = False
-) -> str:
-    imgs_path: str = IMGS_DIR
-    if is_org:
-        imgs_path = f"../{imgs_path}"
+def get_md_grid_pin_str(file_num: int, repo_name: str, repo_url: str) -> str:
+    img_url: str = (
+        f"https://raw.githubusercontent.com/{TARGET_REPO_NAME}/refs/heads/generated/{IMGS_DIR}/{file_num}.svg"
+    )
     grid_str: str = ""
     if file_num % 2 == 0:
         grid_str += "\n"
-    return (
-        grid_str + f"[![{repo_name} pin img]({imgs_path}/{file_num}.svg)]({repo_url}) "
-    )
+    return grid_str + f"[![{repo_name} pin img]({img_url})]({repo_url}) "
 
 
 def update_md_file(update_pin_display_str: str, is_org: bool = False) -> None:
-    md_file_path: Path = Path("profile/README.md" if is_org else "README.md")
+    md_file_path: Path = Path(
+        ORG_PROFILE_DIR + PROFILE_MD_FILE if is_org else PROFILE_MD_FILE
+    )
     if md_file_path.exists():
         update_data: str = sub(
-            pattern=r"(<!-- START: REPO-PINS -->)(.*?)(<!-- END: REPO-PINS -->)",
+            pattern=rf"({MD_PLACEHOLDER_START})(.*?)({MD_PLACEHOLDER_END})",
             repl=rf"\1{update_pin_display_str}\n\3",
             string=md_file_path.read_text(encoding="utf-8"),
             flags=DOTALL,

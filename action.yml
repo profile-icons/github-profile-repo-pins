@@ -1,9 +1,10 @@
 name: "GitHub Profile Repo Pins"
-description: "Customizable public and private profile and Pages repo pins with themes, images, translations, and stats!"
+description: "Design & display any public & private repo pins for GitHub user & organization profiles with auto-translations, images, themes, dynamic ordering & optional stats support."
 author: "profile-icons"
+
 branding:
-  icon: "activity"
-  color: "green"
+  icon: "user"
+  color: "blue"
 
 inputs:
   gh_api_token:
@@ -73,6 +74,7 @@ runs:
         GH_API_TOKEN: ${{ inputs.gh_api_token }}
         GH_USERNAME: ${{ inputs.gh_username }}
         GH_REPO_OWNER: ${{ github.repository_owner }}
+        GH_REPO_NAME: ${{ github.repository }}
         THEME: ${{ inputs.theme }}
         BG_IMG: ${{ inputs.background_image }}
         NUM_REPO_PINS: ${{ inputs.num_repo_pins }}
@@ -84,27 +86,94 @@ runs:
       run: |
         python readme-repo-pins-src/gh_profile_repo_pins.py
 
-    - name: Commit
+    - name: Config git
       shell: bash
       env:
         GH_USERNAME: ${{ inputs.gh_username }}
       run: |
         set -e
-        FILES="$(ls README.md */README.md index.md imgs/*.svg 2>/dev/null | grep -v '^ls:' || true)"
-        if [ -n "$FILES" ]; then
-          git add $FILES
+        : "${GH_USER_NAME:?GH_USER_NAME missing}"; : "${GH_USER_ID:?GH_USER_ID missing}"
+        git config user.name "$GH_USER_NAME"
+        git config user.email "${GH_USER_ID}+${GH_USERNAME}@users.noreply.github.com"
+
+    - name: Save changes
+      shell: bash
+      run: |
+        set -e
+        git diff -- README.md profile/README.md > "$RUNNER_TEMP/readme.patch"
+
+        rm -rf "$RUNNER_TEMP/repo_pin_imgs"
+        mkdir -p "$RUNNER_TEMP/repo_pin_imgs"
+        if [ -d repo_pin_imgs ]; then
+          cp -a repo_pin_imgs/. "$RUNNER_TEMP/repo_pin_imgs/"
         fi
+
+        for file in README.md profile/README.md; do
+          if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+            git restore -- "$file"
+          fi
+        done
+        git restore --staged --worktree -- repo_pin_imgs 2>/dev/null || true
+        git clean -fd -- repo_pin_imgs
+
+    - name: Checkout generated
+      shell: bash
+      run: |
+        set -e
+        git pull
+        git checkout generated || git checkout -b generated
+
+    - name: Commit generated
+      shell: bash
+      run: |
+        set -e
+        rm -rf repo_pin_imgs
+        mkdir -p repo_pin_imgs
+        cp -a "$RUNNER_TEMP/repo_pin_imgs/." repo_pin_imgs/
+
+        git add -A -- repo_pin_imgs
         if ! git diff --cached --quiet; then
-          : "${GH_USER_NAME:?GH_USER_NAME missing}"; : "${GH_USER_ID:?GH_USER_ID missing}"
-          git config user.name "$GH_USER_NAME"
-          git config user.email "${GH_USER_ID}+${GH_USERNAME}@users.noreply.github.com"
-          git commit -m "Auto-update profile repo pins"
+          git commit -m "Auto-update profile repo pins" || true
+          git push --set-upstream origin generated
+        else
+          echo "No changes to commit."
+        fi
+
+    - name: Checkout main
+      shell: bash
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        set -e
+        git checkout "$DEFAULT_BRANCH"
+        git pull --rebase origin "$DEFAULT_BRANCH"
+
+        if [ -s "$RUNNER_TEMP/readme.patch" ]; then
+          git apply "$RUNNER_TEMP/readme.patch"
+        else
+          echo "README patch is empty."
+        fi
+
+    - name: Commit main
+      shell: bash
+      env:
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        set -e
+        for file in README.md profile/README.md; do
+          if [ -f "$file" ]; then
+            git add -- "$file"
+          fi
+        done
+
+        if ! git diff --cached --quiet; then
+          git commit -m "Update README.md"
           for attempt in 1 2 3; do
-            git pull --rebase || true
-            if git push; then
+            if git push origin "$DEFAULT_BRANCH"; then
               exit 0
             fi
             echo "Push failed #$attempt"
+            git pull --rebase origin "$DEFAULT_BRANCH"
             sleep $(((RANDOM % 8) + 3))
           done
           echo "Push failed after retries" >&2

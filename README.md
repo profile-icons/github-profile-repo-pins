@@ -34,7 +34,7 @@ jobs:
   update-pins:
     runs-on: ubuntu-latest
     steps:
-      - uses: profile-icons/readme-repo-pins@v1
+      - uses: profile-icons/github-profile-repo-pins@v1
         with:
           gh_api_token: ${{ secrets.GH_API_TOKEN || secrets.GITHUB_TOKEN }}  # default fallback
           gh_username: ${{ secrets.GH_USERNAME || github.repository_owner }}  # default fallback
