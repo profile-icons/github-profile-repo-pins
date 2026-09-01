@@ -83,6 +83,7 @@ runs:
         IS_EXCLUDE_REPOS_OWNED: ${{ inputs.is_exclude_repos_owned }}
         IS_EXCLUDE_REPOS_CONTRIBUTED: ${{ inputs.is_exclude_repos_contributed }}
         IS_CONTRIBUTION_STATS: ${{ inputs.is_contribution_stats }}
+        HF_TOKEN: ${{ inputs.hf_token }}
       run: |
         python readme-repo-pins-src/gh_profile_repo_pins.py
 

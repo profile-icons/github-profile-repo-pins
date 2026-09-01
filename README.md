@@ -46,7 +46,7 @@ jobs:
           is_exclude_repos_owned: ${{ secrets.IS_EXCLUDE_REPOS_OWNED }}  # optional
           is_exclude_repos_contributed: ${{ secrets.IS_EXCLUDE_REPOS_CONTRIBUTED }}  # optional
           is_contribution_stats: ${{ secrets.IS_CONTRIBUTION_STATS }}  # optional
- 
+          hf_token: ${{ secrets.HF_TOKEN }}  # optional
 ```
 
 ### README
@@ -319,4 +319,18 @@ where:
 * `is_stats` is either `true` (any value) or `false` (empty) - optional `[]`
 
 > The default `IS_CONTRIBUTION_STATS` is `false`
+</details>
+
+<details>
+<summary>Huggingface Token</summary>
+
+The optional `HF_TOKEN` configuration authenticates requests for faster downloading with higher rate limits.
+
+This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+
+* key: `HF_TOKEN`
+* value: `[huggingface-token]`
+
+where:
+* `huggingface-token` is a unique token code generated from a personal HuggingFace account - optional `[]`
 </details>

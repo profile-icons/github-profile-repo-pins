@@ -1158,7 +1158,7 @@ class RepoPinImgTranslator:
 
         self.__tokenizer.src_lang = nllb_src
         encoded: BatchEncoding[Tensor] = self.__tokenizer(
-            input_txt, return_tensors="pt", truncation=True, max_length=512
+            input_txt, return_tensors="pt", truncation=True, max_length=256
         ).to(device=self.__device)
 
         for target_locale in self.__SUPPORTED_LOCALES:
@@ -1177,8 +1177,7 @@ class RepoPinImgTranslator:
                     generated = self.__model.generate(
                         **encoded,
                         forced_bos_token_id=target_token_id,
-                        max_new_tokens=128,
-                        max_length=512,
+                        max_new_tokens=64,
                     )
                 translated = self.__tokenizer.batch_decode(
                     sequences=generated, skip_special_tokens=True
