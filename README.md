@@ -329,8 +329,8 @@ The optional `HF_TOKEN` configuration authenticates requests for faster download
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 
 * key: `HF_TOKEN`
-* value: `[huggingface-token]`
+* value: `[hf_token]`
 
 where:
-* `huggingface-token` is a unique token code generated from a personal HuggingFace account - optional `[]`
+* `hf_token` is a unique token code generated from a personal HuggingFace account - optional `[]`
 </details>
