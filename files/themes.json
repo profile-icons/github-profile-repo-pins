@@ -62,5 +62,21 @@
       "link": "#58a6ff",
       "danger": "#ff6b6b"
     }
+  },
+  "nord": {
+    "light": {
+      "canvas": "#eceff4",
+      "border": "#d8dee9",
+      "text": "#4c566a",
+      "link": "#5e81ac",
+      "danger": "#bf616a"
+    },
+    "dark": {
+      "canvas": "#2e3440",
+      "border": "#4c566a",
+      "text": "#d8dee9",
+      "link": "#88c0d0",
+      "danger": "#bf616a"
+    }
   }
 }
