@@ -6,7 +6,7 @@ Design & display any public & private repository pin visualizations for GitHub u
 * custom selection of any public and (authorized) private repository
 * custom themes - select from [existing](https://github.com/profile-icons/readme-repo-pins/blob/main/files/themes.json), or [create your own](https://github.com/profile-icons/readme-repo-pins/issues/1)
 * custom background imagery - URL or filepath
-* automatic i18n translations to match browser language - may require cache refresh
+* automatic i18n translations (using [facebook/nllb-200-distilled-600M](https://huggingface.co/facebook/nllb-200-distilled-600M)) - may require cache refresh
 * (optional) user contribution statistics 
 
 Pins for private repositories automatically link to deployed public Pages if the link is set to the repository.

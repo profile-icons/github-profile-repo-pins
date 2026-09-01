@@ -5,7 +5,6 @@ from PIL import Image as im, ImageOps as im_ops
 from requests import get, Response, HTTPError
 from urllib.parse import urlparse
 from base64 import b64encode
-from cairosvg import svg2png
 from io import BytesIO
 
 
@@ -64,10 +63,22 @@ class RepoPinImgMedia:
 
     def __decode_img(self, byte_img: bytes) -> im.Image:
         if self.__img_mime == enums.RepoPinsImgMediaImgMime.SVG:
+            try:
+                from cairosvg import svg2png
+            except (ImportError, OSError) as err:
+                raise RepoPinImageMediaError(
+                    msg="SVG image conversion requires CairoSVG and the native Cairo library."
+                ) from err
+
             raw_conversion: BytesIO = BytesIO()
-            svg2png(bytestring=byte_img, write_to=raw_conversion)
+            svg2png(
+                bytestring=byte_img,
+                write_to=raw_conversion,
+            )
             raw_conversion.seek(0)
+
             return im.open(fp=raw_conversion)
+
         return im.open(fp=BytesIO(initial_bytes=byte_img))
 
     def __format_encoded_img(self, byte_img: bytes) -> bytes:

@@ -1,71 +1,16 @@
-from gh_profile_repo_pins.utils import get_logger, Logger
-from langdetect import detect, DetectorFactory
-from deep_translator import GoogleTranslator
+from transformers import (
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+    BatchEncoding,
+)
+from lingua import LanguageDetectorBuilder, LanguageDetector, Language, IsoCode639_1
+from gh_profile_repo_pins.utils import Logger, get_logger
+from torch import cuda, device, inference_mode, Tensor
 
 
-class RepoPinImgTranslator(GoogleTranslator):
-
-    # 21 more commonly used languages supported by langdetect (~1-2 s per language translation)
-    __COMMON_LANGS: list[str] = [
-        "en",
-        "es",
-        "fr",
-        "de",
-        "pt",
-        "ru",
-        "zh-CN",
-        "zh-TW",
-        "ja",
-        "ko",
-        "ar",
-        "hi",
-        "it",
-        "tr",
-        "nl",
-        "sv",
-        "pl",
-        "id",
-        "th",
-        "vi",
-        "uk",
-    ]
-    # other languages supported by langdetect (deep_translate uses iw instead of he)
-    __OTHER_LANGS: list[str] = [
-        "af",
-        "bg",
-        "bn",
-        "ca",
-        "cs",
-        "cy",
-        "da",
-        "el",
-        "et",
-        "fa",
-        "fi",
-        "gu",
-        "he",
-        "hr",
-        "hu",
-        "kn",
-        "lt",
-        "lv",
-        "mk",
-        "ml",
-        "mr",
-        "ne",
-        "no",
-        "pa",
-        "ro",
-        "sk",
-        "sl",
-        "so",
-        "sq",
-        "sw",
-        "ta",
-        "te",
-        "tl",
-        "ur",
-    ]
+class RepoPinImgTranslator:
 
     __STATIC_TRANSLATIONS: dict[str, dict[str, str]] = {
         "public": {
@@ -1015,29 +960,235 @@ class RepoPinImgTranslator(GoogleTranslator):
         },
     }
 
+    __SUPPORTED_LOCALES: tuple[str, ...] = tuple(__STATIC_TRANSLATIONS["public"].keys())
+
+    __MODEL_NAME: str = "facebook/nllb-200-distilled-600M"
+
+    __MODEL_CODES: dict[str, str] = {
+        "af": "afr_Latn",
+        "sq": "als_Latn",
+        "am": "amh_Ethi",
+        "ar": "arb_Arab",
+        "hy": "hye_Armn",
+        "as": "asm_Beng",
+        "ay": "ayr_Latn",
+        "az": "azj_Latn",
+        "bm": "bam_Latn",
+        "eu": "eus_Latn",
+        "be": "bel_Cyrl",
+        "bn": "ben_Beng",
+        "bho": "bho_Deva",
+        "bs": "bos_Latn",
+        "bg": "bul_Cyrl",
+        "ca": "cat_Latn",
+        "ceb": "ceb_Latn",
+        "ny": "nya_Latn",
+        "zh-CN": "zho_Hans",
+        "zh-TW": "zho_Hant",
+        "hr": "hrv_Latn",
+        "cs": "ces_Latn",
+        "da": "dan_Latn",
+        "nl": "nld_Latn",
+        "en": "eng_Latn",
+        "eo": "epo_Latn",
+        "et": "est_Latn",
+        "ee": "ewe_Latn",
+        "tl": "tgl_Latn",
+        "fi": "fin_Latn",
+        "fr": "fra_Latn",
+        "gl": "glg_Latn",
+        "ka": "kat_Geor",
+        "de": "deu_Latn",
+        "el": "ell_Grek",
+        "gn": "grn_Latn",
+        "gu": "guj_Gujr",
+        "ht": "hat_Latn",
+        "ha": "hau_Latn",
+        "he": "heb_Hebr",
+        "hi": "hin_Deva",
+        "hu": "hun_Latn",
+        "is": "isl_Latn",
+        "ig": "ibo_Latn",
+        "ilo": "ilo_Latn",
+        "id": "ind_Latn",
+        "ga": "gle_Latn",
+        "it": "ita_Latn",
+        "ja": "jpn_Jpan",
+        "jw": "jav_Latn",
+        "kn": "kan_Knda",
+        "kk": "kaz_Cyrl",
+        "km": "khm_Khmr",
+        "rw": "kin_Latn",
+        "ko": "kor_Hang",
+        "ku": "kmr_Latn",
+        "ckb": "ckb_Arab",
+        "ky": "kir_Cyrl",
+        "lo": "lao_Laoo",
+        "lv": "lvs_Latn",
+        "ln": "lin_Latn",
+        "lt": "lit_Latn",
+        "lg": "lug_Latn",
+        "lb": "ltz_Latn",
+        "mk": "mkd_Cyrl",
+        "mai": "mai_Deva",
+        "mg": "plt_Latn",
+        "ms": "zsm_Latn",
+        "ml": "mal_Mlym",
+        "mt": "mlt_Latn",
+        "mi": "mri_Latn",
+        "mr": "mar_Deva",
+        "lus": "lus_Latn",
+        "mn": "khk_Cyrl",
+        "my": "mya_Mymr",
+        "ne": "npi_Deva",
+        "no": "nob_Latn",
+        "or": "ory_Orya",
+        "om": "gaz_Latn",
+        "ps": "pbt_Arab",
+        "fa": "pes_Arab",
+        "pl": "pol_Latn",
+        "pt": "por_Latn",
+        "pa": "pan_Guru",
+        "qu": "quy_Latn",
+        "ro": "ron_Latn",
+        "ru": "rus_Cyrl",
+        "sm": "smo_Latn",
+        "sa": "san_Deva",
+        "gd": "gla_Latn",
+        "nso": "nso_Latn",
+        "sr": "srp_Cyrl",
+        "st": "sot_Latn",
+        "sn": "sna_Latn",
+        "sd": "snd_Arab",
+        "si": "sin_Sinh",
+        "sk": "slk_Latn",
+        "sl": "slv_Latn",
+        "so": "som_Latn",
+        "es": "spa_Latn",
+        "su": "sun_Latn",
+        "sw": "swh_Latn",
+        "sv": "swe_Latn",
+        "tg": "tgk_Cyrl",
+        "ta": "tam_Taml",
+        "tt": "tat_Cyrl",
+        "te": "tel_Telu",
+        "th": "tha_Thai",
+        "ti": "tir_Ethi",
+        "ts": "tso_Latn",
+        "tr": "tur_Latn",
+        "tk": "tuk_Latn",
+        "ak": "aka_Latn",
+        "uk": "ukr_Cyrl",
+        "ur": "urd_Arab",
+        "ug": "uig_Arab",
+        "uz": "uzn_Latn",
+        "vi": "vie_Latn",
+        "cy": "cym_Latn",
+        "xh": "xho_Latn",
+        "yi": "ydd_Hebr",
+        "yo": "yor_Latn",
+        "zu": "zul_Latn",
+        "zh": "zho_Hans",
+        "fil": "tgl_Latn",
+        "jv": "jav_Latn",
+        "nb": "nob_Latn",
+    }
+
     def __init__(self):
-        super().__init__()
-        DetectorFactory.seed = 42
-        self.__dt_langs: list[str] = list(
-            self.get_supported_languages(as_dict=True).values()
-        )  # deep_translate langs
         self.__log: Logger = get_logger()
+        self.__device: device = device("cuda" if cuda.is_available() else "cpu")
+        self.__language_detector: LanguageDetector = (
+            LanguageDetectorBuilder.from_all_spoken_languages().build()
+        )
+        self.__tokenizer: PreTrainedTokenizerBase | None = None
+        self.__model: PreTrainedModel | None = None
+        self.__init_model()
+
+    def __init_model(self) -> None:
+        if self.__tokenizer is not None and self.__model is not None:
+            return
+
+        self.__log.info(msg=f"Loading translation model: {self.__MODEL_NAME}...")
+        self.__tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path=self.__MODEL_NAME
+        )
+        self.__model = AutoModelForSeq2SeqLM.from_pretrained(
+            pretrained_model_name_or_path=self.__MODEL_NAME
+        )
+
+        if self.__model is not None:
+            self.__model.to(self.__device)
+            self.__model.eval()
 
     def translate_all(self, input_txt: str) -> dict[str, str]:
         translations: dict[str, str] = (
-            self.__STATIC_TRANSLATIONS.get(input_txt.lower(), {}) or {}
+            self.__STATIC_TRANSLATIONS.get(input_txt.strip().lower(), {}) or {}
         )
-        if not translations:
+        if translations:
+            return translations
+
+        assert self.__tokenizer is not None
+        assert self.__model is not None
+
+        try:
+            language: Language | None = self.__language_detector.detect_language_of(
+                text=input_txt
+            )
+            if language is None:
+                raise ValueError("Unable to detect language")
+
+            iso_code: IsoCode639_1 = language.iso_code_639_1
+            if iso_code is None:
+                raise ValueError(f"No ISO 639-1 code for detected language: {language}")
+
+            input_txt_lang: str = iso_code.name.lower()
+            translations[input_txt_lang] = input_txt
+
+        except Exception as err:
+            self.__log.error(msg=f"Language detect: {input_txt}: {str(err)}")
+            input_txt_lang = "en"
+            translations["en"] = input_txt
+
+        nllb_src: str | None = self.__MODEL_CODES.get(input_txt_lang)
+        if nllb_src is None:
+            self.__log.warning(
+                msg=f"NLLB source language unsupported: {input_txt_lang}: {input_txt}"
+            )
+            return translations
+
+        self.__tokenizer.src_lang = nllb_src
+        encoded: BatchEncoding[Tensor] = self.__tokenizer(
+            input_txt, return_tensors="pt", truncation=True, max_length=512
+        ).to(device=self.__device)
+
+        for target_locale in self.__SUPPORTED_LOCALES:
+            nllb_target: str | None = self.__MODEL_CODES.get(target_locale)
+            if nllb_target is None or nllb_target == nllb_src:
+                continue
+
             try:
-                input_txt_lang: str = detect(text=input_txt)
-                translations[input_txt_lang] = input_txt
+                target_token_id = self.__tokenizer.convert_tokens_to_ids(
+                    tokens=nllb_target
+                )
+                if target_token_id == self.__tokenizer.unk_token_id:
+                    continue
+
+                with inference_mode():
+                    generated = self.__model.generate(
+                        **encoded,
+                        forced_bos_token_id=target_token_id,
+                        max_new_tokens=128,
+                        max_length=512,
+                    )
+                translated = self.__tokenizer.batch_decode(
+                    sequences=generated, skip_special_tokens=True
+                )[0].strip()
+                if translated:
+                    translations[target_locale] = translated
+
             except Exception as err:
-                self.__log.error(msg=f"Language detect: {input_txt}: {str(err)}")
-            try:
-                for target_lang in self.__COMMON_LANGS:
-                    if target_lang in self.__dt_langs:
-                        self.target = target_lang
-                        translations[target_lang] = self.translate(text=input_txt)
-            except Exception as err:
-                self.__log.error(msg=f"Translate: {input_txt}: {str(err)}")
+                self.__log.error(
+                    msg=f"Translate {input_txt_lang} -> {target_locale}: {str(err)}"
+                )
+
         return translations

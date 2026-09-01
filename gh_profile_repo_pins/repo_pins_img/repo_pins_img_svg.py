@@ -21,6 +21,20 @@ class RepoPinImg:
     __DESC_SIZE: float | int = 13 * __SCALE
     __DESC_LINE_H: float | int = 1.35 * __DESC_SIZE
 
+    __RTL_LOCALES: frozenset[str] = frozenset(
+        {
+            "ar",
+            "ckb",
+            "fa",
+            "he",
+            "ps",
+            "sd",
+            "ug",
+            "ur",
+            "yi",
+        }
+    )
+
     __ICON_REPO: str = (
         "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 "
         "0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 "
@@ -178,7 +192,7 @@ class RepoPinImg:
                 end = mid - 1
         return (txt[:start] + ell) if start > 0 else ell
 
-    def __href_link_open(self, url: str, url_path: str = None) -> None:
+    def __href_link_open(self, url: str, url_path: str | None = None) -> None:
         self.__svg_str += (
             f'<a href="{url}/{url_path if url_path else ""}" target="_blank">'
         )
@@ -410,6 +424,7 @@ class RepoPinImg:
         description_txt: str,
         description_y: float | int,
         description_h: float | int,
+        is_rtl: bool = False,
     ) -> str:
         wrapped_description_lines: list[str] = self.__wrap_lines(
             description_txt=description_txt,
@@ -421,14 +436,16 @@ class RepoPinImg:
         for i, line in enumerate(wrapped_description_lines):
             svg_txt += (
                 f"<text "
-                f'x="{self.__PADDING}" '
+                f'x="{self.__WIDTH - self.__PADDING if is_rtl else self.__PADDING}" '
                 f'y="{(description_y + self.__DESC_SIZE) + (i * self.__DESC_LINE_H):.2f}" '
                 f'font-size="{self.__DESC_SIZE}" '
-                f'fill="var(--text)"'
+                f'fill="var(--text)" '
+                f'{"direction=\"rtl\" text-anchor=\"end\" " if is_rtl else ""}'
                 f">"
                 f"{self.__format_svg_txt(txt=line)}"
                 f"</text>"
             )
+
         return svg_txt
 
     def __description_multi_lang(
@@ -447,6 +464,7 @@ class RepoPinImg:
                 description_txt=translated_description,
                 description_y=description_y,
                 description_h=description_h,
+                is_rtl=lang in self.__RTL_LOCALES,
             )
             svg_switch += "</g>"
         svg_switch += "<g>"
