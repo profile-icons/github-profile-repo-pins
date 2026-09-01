@@ -37,6 +37,9 @@ inputs:
   is_exclude_repos_contributed:
     description: "Exclude contributed repos not pinned. True or False (empty). Overridden by `repo_names_exclusive`."
     required: false
+  hf-token:
+    description: "HuggingFace token to authenticate requests for faster downloading with higher rate limits."
+    required: false
 
 runs:
   using: "composite"
