@@ -1355,7 +1355,9 @@ class RepoPinImgTranslator:
             or None
         )
 
-    def translate_all(self, input_txt: str, is_nllb_trans: bool = True) -> dict[str, str]:
+    def translate_all(
+        self, input_txt: str, is_nllb_trans: bool = True
+    ) -> dict[str, str]:
         translations: dict[str, str] = (
             self.__STATIC_TRANSLATIONS.get(input_txt.strip().lower(), {}) or {}
         )
@@ -1383,13 +1385,16 @@ class RepoPinImgTranslator:
             if locale != input_txt_lang and locale not in m2m_supported_locales
         ]
 
-        num_locales: int = len(m2m_supported_locales) + (len(nllb_supported_locales) if is_nllb_trans else 0)
+        num_locales: int = len(m2m_supported_locales) + (
+            len(nllb_supported_locales) if is_nllb_trans else 0
+        )
         num_trans: int = 0
-
 
         for target_locale in m2m_supported_locales:
             if num_trans != 0 and num_trans % 10 == 0:
-                self.__log.info(msg=f"Repo pin translations progress: {(num_trans / num_locales * 100)}% ({num_trans}/{num_locales})")
+                self.__log.info(
+                    msg=f"Repo pin translations progress: {(num_trans / num_locales * 100):.2f}% ({num_trans}/{num_locales})"
+                )
 
             try:
                 translated: str | None = self.__translate_m2m(
@@ -1424,7 +1429,9 @@ class RepoPinImgTranslator:
         if is_nllb_trans:
             for target_locale in nllb_supported_locales:
                 if num_trans != 0 and num_trans % 10 == 0:
-                    self.__log.info(msg=f"Repo pin translations progress: {(num_trans / num_locales * 100)}% ({num_trans}/{num_locales})")
+                    self.__log.info(
+                        msg=f"Repo pin translations progress: {(num_trans / num_locales * 100):.2f}% ({num_trans}/{num_locales})"
+                    )
 
                 try:
                     translated = self.__translate_nllb(

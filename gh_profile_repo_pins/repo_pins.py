@@ -164,7 +164,7 @@ class ReadMeRepoPins:
             is_org=self.__gh_api_client.is_org,
             theme=self.__theme,
             bg_img=self.__bg_img,
-            is_nllb_trans=self.__is_nllb_trans
+            is_nllb_trans=self.__is_nllb_trans,
         )
         gen_repo_pins.grid_display()
 

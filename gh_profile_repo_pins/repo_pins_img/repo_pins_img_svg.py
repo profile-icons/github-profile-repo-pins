@@ -118,7 +118,9 @@ class RepoPinImg:
     __WIDE_CHARS = set("mwMW@&%#$")
     __NARROW_CHARS = set("il!|:;.,`'")
 
-    def __init__(self, repo_pin_data: RepoPinImgData, is_nllb_trans: bool = False) -> None:
+    def __init__(
+        self, repo_pin_data: RepoPinImgData, is_nllb_trans: bool = False
+    ) -> None:
         self.__repo_pin_data: RepoPinImgData = repo_pin_data
         self.__repo_pin_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] = (
             RepoPinImgTheme(
@@ -456,7 +458,9 @@ class RepoPinImg:
         description_h: float | int,
     ) -> str:
         multi_lang_descriptions: dict[str, str] = (
-            self.__repo_pin_translator.translate_all(input_txt=description_txt, is_nllb_trans=self.__is_nllb_trans)
+            self.__repo_pin_translator.translate_all(
+                input_txt=description_txt, is_nllb_trans=self.__is_nllb_trans
+            )
         )
         svg_switch: str = "<switch>"
         for lang, translated_description in multi_lang_descriptions.items():
@@ -932,14 +936,13 @@ def tst_svg_render(
             enums.RepoPinsResDictKeys.OWNER.value: {
                 enums.RepoPinsResDictKeys.LOGIN.value: "profile-icons"
             },
-            enums.RepoPinsResDictKeys.DESCRIPTION.value: "hello, I am Adam",
-            # enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
-            # "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
-            # "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris "
-            # "nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in "
-            # "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
-            # "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
-            # "culpa qui officia deserunt mollit anim id est laborum.",
+            enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
+            "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
+            "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris "
+            "nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in "
+            "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
+            "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
+            "culpa qui officia deserunt mollit anim id est laborum.",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/profile-icons/readme-repo-pins",
             enums.RepoPinsResDictKeys.URL_CUSTOM.value: "https://github.com/FALSE/FALSE",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {
@@ -992,9 +995,8 @@ def tst_svg_render(
             enums.RepoPinsResDictKeys.OWNER.value: {
                 enums.RepoPinsResDictKeys.LOGIN.value: test_username
             },
-            enums.RepoPinsResDictKeys.DESCRIPTION.value: "No. No latin is found here.",
-            # enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
-            # "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
+            "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/FALSE/FALSE",
             enums.RepoPinsResDictKeys.URL_CUSTOM.value: f"https://github.com/{test_username}/{test_username}",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {
@@ -1026,7 +1028,7 @@ def tst_svg_render(
             enums.RepoPinsResDictKeys.OWNER.value: {
                 enums.RepoPinsResDictKeys.LOGIN.value: "profile-icons"
             },
-            enums.RepoPinsResDictKeys.DESCRIPTION.value: "Why is there no text here?",
+            enums.RepoPinsResDictKeys.DESCRIPTION.value: "",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/profile-icons/readme-repo-pins",
             enums.RepoPinsResDictKeys.URL_CUSTOM.value: "",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {},
@@ -1042,7 +1044,9 @@ def tst_svg_render(
     try:
         for i, tst_repo_data in enumerate(tst_input):
             if i > 0:
-                log.info(msg=f"Render repo pins progress: {(i / len(tst_input) * 100)}%.2 ({i}/{len(tst_input)})")
+                log.info(
+                    msg=f"Render repo pins progress: {(i / len(tst_input) * 100):.2f}% ({i}/{len(tst_input)})"
+                )
             repo_pin: RepoPinImgData = RepoPinImgData.format_repo_pin_data(
                 repo_data=tst_repo_data,
                 user_repo_owner=test_username,
@@ -1052,7 +1056,9 @@ def tst_svg_render(
                 theme_name=enums.RepoPinsImgThemeName(test_theme_name),
                 bg_img=test_bg_img,
             )
-            repo_pin_img: RepoPinImg = RepoPinImg(repo_pin_data=repo_pin, is_nllb_trans=is_nllb_trans)
+            repo_pin_img: RepoPinImg = RepoPinImg(
+                repo_pin_data=repo_pin, is_nllb_trans=is_nllb_trans
+            )
             repo_pin_img.render()
             write_svg(svg_obj_str=repo_pin_img.svg, file_name=f"-{i + 1}")
     except ValueError:

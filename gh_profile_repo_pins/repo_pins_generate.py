@@ -103,8 +103,12 @@ class GenerateRepoPins:
         del_imgs()
         for i, repo_pin in enumerate(self.__repo_pins):
             if i > 0:
-                self.__log.info(msg=f"Render repo pins progress: {(i / len(self.__repo_pins) * 100)}%.2 ({i}/{len(self.__repo_pins)})")
-            repo_pin_img: RepoPinImg = RepoPinImg(repo_pin_data=repo_pin, is_nllb_trans=self.__is_nllb_trans)
+                self.__log.info(
+                    msg=f"Render repo pins progress: {(i / len(self.__repo_pins) * 100):.2f}% ({i}/{len(self.__repo_pins)})"
+                )
+            repo_pin_img: RepoPinImg = RepoPinImg(
+                repo_pin_data=repo_pin, is_nllb_trans=self.__is_nllb_trans
+            )
             repo_pin_img.render()
             write_svg(svg_obj_str=repo_pin_img.svg, file_name=str(i))
 
