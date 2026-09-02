@@ -1355,7 +1355,7 @@ class RepoPinImgTranslator:
             or None
         )
 
-    def translate_all(self, input_txt: str) -> dict[str, str]:
+    def translate_all(self, input_txt: str, is_nllb_trans: bool = True) -> dict[str, str]:
         translations: dict[str, str] = (
             self.__STATIC_TRANSLATIONS.get(input_txt.strip().lower(), {}) or {}
         )
@@ -1370,20 +1370,27 @@ class RepoPinImgTranslator:
             )
             return translations
 
-        fast_targets: list[str] = [
+        m2m_supported_locales: list[str] = [
             locale
             for locale in self.__SUPPORTED_LOCALES
             if locale != input_txt_lang
             and input_txt_lang in self.__M2M_CODES
             and locale in self.__M2M_CODES
         ]
-        fallback_targets: list[str] = [
+        nllb_supported_locales: list[str] = [
             locale
             for locale in self.__SUPPORTED_LOCALES
-            if locale != input_txt_lang and locale not in fast_targets
+            if locale != input_txt_lang and locale not in m2m_supported_locales
         ]
 
-        for target_locale in fast_targets:
+        num_locales: int = len(m2m_supported_locales) + (len(nllb_supported_locales) if is_nllb_trans else 0)
+        num_trans: int = 0
+
+
+        for target_locale in m2m_supported_locales:
+            if num_trans != 0 and num_trans % 10 == 0:
+                self.__log.info(msg=f"Repo pin translations progress: {(num_trans / num_locales * 100)}% ({num_trans}/{num_locales})")
+
             try:
                 translated: str | None = self.__translate_m2m(
                     input_txt=input_txt,
@@ -1392,10 +1399,33 @@ class RepoPinImgTranslator:
                 )
                 if translated:
                     translations[target_locale] = translated
+
             except Exception as err:
                 self.__log.warning(
                     msg=f"M2M100 failed {input_txt_lang} -> {target_locale}; trying NLLB: {str(err)}..."
                 )
+
+                if is_nllb_trans:
+                    try:
+                        translated = self.__translate_nllb(
+                            input_txt=input_txt,
+                            source_locale=input_txt_lang,
+                            target_locale=target_locale,
+                        )
+                        if translated:
+                            translations[target_locale] = translated
+                    except Exception as fallback_err:
+                        self.__log.error(
+                            msg=f"Translate {input_txt_lang} -> {target_locale}: {str(fallback_err)}"
+                        )
+
+            num_trans += 1
+
+        if is_nllb_trans:
+            for target_locale in nllb_supported_locales:
+                if num_trans != 0 and num_trans % 10 == 0:
+                    self.__log.info(msg=f"Repo pin translations progress: {(num_trans / num_locales * 100)}% ({num_trans}/{num_locales})")
+
                 try:
                     translated = self.__translate_nllb(
                         input_txt=input_txt,
@@ -1404,23 +1434,11 @@ class RepoPinImgTranslator:
                     )
                     if translated:
                         translations[target_locale] = translated
-                except Exception as fallback_err:
+                except Exception as err:
                     self.__log.error(
-                        msg=f"Translate {input_txt_lang} -> {target_locale}: {str(fallback_err)}"
+                        msg=f"Translate {input_txt_lang} -> {target_locale}: {str(err)}"
                     )
 
-        for target_locale in fallback_targets:
-            try:
-                translated = self.__translate_nllb(
-                    input_txt=input_txt,
-                    source_locale=input_txt_lang,
-                    target_locale=target_locale,
-                )
-                if translated:
-                    translations[target_locale] = translated
-            except Exception as err:
-                self.__log.error(
-                    msg=f"Translate {input_txt_lang} -> {target_locale}: {str(err)}"
-                )
+            num_trans += 1
 
         return translations

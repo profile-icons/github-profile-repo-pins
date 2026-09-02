@@ -118,7 +118,7 @@ class RepoPinImg:
     __WIDE_CHARS = set("mwMW@&%#$")
     __NARROW_CHARS = set("il!|:;.,`'")
 
-    def __init__(self, repo_pin_data: RepoPinImgData) -> None:
+    def __init__(self, repo_pin_data: RepoPinImgData, is_nllb_trans: bool = False) -> None:
         self.__repo_pin_data: RepoPinImgData = repo_pin_data
         self.__repo_pin_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] = (
             RepoPinImgTheme(
@@ -126,6 +126,7 @@ class RepoPinImg:
             ).svg_theme
         )
         self.__repo_pin_translator: RepoPinImgTranslator = RepoPinImgTranslator()
+        self.__is_nllb_trans: bool = is_nllb_trans
         self.__svg_str: str = ""
 
     @staticmethod
@@ -293,7 +294,7 @@ class RepoPinImg:
     ) -> str:
         svg_switch: str = "<switch>"
         for lang, translated_badge_text in self.__repo_pin_translator.translate_all(
-            input_txt=badge_txt
+            input_txt=badge_txt, is_nllb_trans=self.__is_nllb_trans
         ).items():
             svg_switch += f'<g systemLanguage="{lang}">'
             svg_switch += self.__badge(
@@ -455,7 +456,7 @@ class RepoPinImg:
         description_h: float | int,
     ) -> str:
         multi_lang_descriptions: dict[str, str] = (
-            self.__repo_pin_translator.translate_all(input_txt=description_txt)
+            self.__repo_pin_translator.translate_all(input_txt=description_txt, is_nllb_trans=self.__is_nllb_trans)
         )
         svg_switch: str = "<switch>"
         for lang, translated_description in multi_lang_descriptions.items():
@@ -906,7 +907,11 @@ def tst_svg_render(
         RepoPinImageMediaError,
     )
     from gh_profile_repo_pins.repo_pins_generate import GenerateRepoPins
+    from gh_profile_repo_pins.utils import Logger, get_logger
     from gh_profile_repo_pins.utils import write_svg
+
+    log: Logger = get_logger()
+    is_nllb_trans: bool = True
 
     GenerateRepoPins.update_themes()  # update the database with any new json themes not in enums.RepoPinsImgThemeName
 
@@ -1036,6 +1041,8 @@ def tst_svg_render(
 
     try:
         for i, tst_repo_data in enumerate(tst_input):
+            if i > 0:
+                log.info(msg=f"Render repo pins progress: {(i / len(tst_input) * 100)}%.2 ({i}/{len(tst_input)})")
             repo_pin: RepoPinImgData = RepoPinImgData.format_repo_pin_data(
                 repo_data=tst_repo_data,
                 user_repo_owner=test_username,
@@ -1045,7 +1052,7 @@ def tst_svg_render(
                 theme_name=enums.RepoPinsImgThemeName(test_theme_name),
                 bg_img=test_bg_img,
             )
-            repo_pin_img: RepoPinImg = RepoPinImg(repo_pin_data=repo_pin)
+            repo_pin_img: RepoPinImg = RepoPinImg(repo_pin_data=repo_pin, is_nllb_trans=is_nllb_trans)
             repo_pin_img.render()
             write_svg(svg_obj_str=repo_pin_img.svg, file_name=f"-{i + 1}")
     except ValueError:

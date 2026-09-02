@@ -8,6 +8,7 @@ from gh_profile_repo_pins.utils import (
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_data import RepoPinImgData
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageThemeError
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_svg import RepoPinImg
+from gh_profile_repo_pins.utils import Logger, get_logger
 import gh_profile_repo_pins.repo_pins_enum as enums
 
 
@@ -23,8 +24,11 @@ class GenerateRepoPins:
         is_org: bool,
         theme: str | dict | None,
         bg_img: dict | str | None = None,
+        is_nllb_trans: bool = False,
     ) -> None:
+        self.__log: Logger = get_logger()
         self.update_themes()  # update the database with any new json themes not in enums.RepoPinsImgThemeName
+        self.__is_nllb_trans: bool = is_nllb_trans
         self.__is_org: bool = is_org
 
         try:
@@ -98,7 +102,9 @@ class GenerateRepoPins:
     def __render_repo_pin_imgs(self) -> None:
         del_imgs()
         for i, repo_pin in enumerate(self.__repo_pins):
-            repo_pin_img: RepoPinImg = RepoPinImg(repo_pin_data=repo_pin)
+            if i > 0:
+                self.__log.info(msg=f"Render repo pins progress: {(i / len(self.__repo_pins) * 100)}%.2 ({i}/{len(self.__repo_pins)})")
+            repo_pin_img: RepoPinImg = RepoPinImg(repo_pin_data=repo_pin, is_nllb_trans=self.__is_nllb_trans)
             repo_pin_img.render()
             write_svg(svg_obj_str=repo_pin_img.svg, file_name=str(i))
 

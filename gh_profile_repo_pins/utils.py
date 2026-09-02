@@ -81,6 +81,9 @@ IS_EXCLUDE_REPOS_CONTRIBUTED: str = environ.get("IS_EXCLUDE_REPOS_CONTRIBUTED", 
 # optional config, independent to other configs, default False
 IS_CONTRIBUTION_STATS: str = environ.get("IS_CONTRIBUTION_STATS", "")
 
+# optional, use a larger NLLB model for i18n translations not supported by faster M2M model
+IS_NLLB: str = environ.get("IS_NLLB", "")
+
 
 def parse_bg_img(bg_img: str) -> dict | str | None:
     if bg_img:
@@ -180,6 +183,12 @@ def parse_args() -> tuple:
         default=True if IS_CONTRIBUTION_STATS else False,
         help="If repository contribution stats (commit add/del changes) are/not included. Default: False.",
     )
+    parser.add_argument(
+        "--is-nllb",
+        action="store_true",
+        default=True if IS_NLLB else False,
+        help="If use a larger NLLB model for i18n translations not supported by faster M2M model. Default: False.",
+    )
     args = parser.parse_args()
 
     exclusive_repo_name_pattern = compile(r"^\s*(?:,?\s*[\w.-]+/[\w.-]+\s*)*,?\s*$")
@@ -237,6 +246,7 @@ def parse_args() -> tuple:
         args.not_contributed,
         args.owner,
         args.stats,
+        args.is_nllb,
     )
 
 

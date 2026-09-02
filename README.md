@@ -46,6 +46,7 @@ jobs:
           is_exclude_repos_owned: ${{ secrets.IS_EXCLUDE_REPOS_OWNED }}  # optional
           is_exclude_repos_contributed: ${{ secrets.IS_EXCLUDE_REPOS_CONTRIBUTED }}  # optional
           is_contribution_stats: ${{ secrets.IS_CONTRIBUTION_STATS }}  # optional
+          is_nllb: ${{ secrets.IS_NLLB }}  # optional
           hf_token: ${{ secrets.HF_TOKEN }}  # optional
 ```
 
@@ -320,6 +321,24 @@ where:
 
 > The default `IS_CONTRIBUTION_STATS` is `false`
 </details>
+
+<details>
+<summary>NLLB Model</summary>
+
+The optional `IS_NLLB` configuration controls whether a larger NLLB model is used for i18n translations not supported
+by a faster M2M mode.
+
+This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
+
+* key: `IS_NLLB`
+* value: `[is_nllb]`
+
+where:
+* `is_nllb` is either `true` (any value) or `false` (empty) - optional `[]`
+
+> The default `IS_NLLB` is `false`
+</details>
+
 
 <details>
 <summary>Huggingface Token</summary>

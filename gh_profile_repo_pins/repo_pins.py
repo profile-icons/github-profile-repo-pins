@@ -34,6 +34,7 @@ class ReadMeRepoPins:
         is_exclude_repos_contributed: bool = False,
         repo_owner: str | None = None,
         is_contribution_stats: bool = False,
+        is_nllb_trans: bool = False,
     ) -> None:
         self.__log: Logger = get_logger()
         try:
@@ -104,6 +105,8 @@ class ReadMeRepoPins:
             RepoPinStats(gh_token=api_token) if self.__is_contribution_stats else None
         )
 
+        self.__is_nllb_trans: bool = is_nllb_trans
+
     def __order_repos_by_exclusive_preference(self) -> None:
         self.__repo_pins = [
             repo
@@ -161,6 +164,7 @@ class ReadMeRepoPins:
             is_org=self.__gh_api_client.is_org,
             theme=self.__theme,
             bg_img=self.__bg_img,
+            is_nllb_trans=self.__is_nllb_trans
         )
         gen_repo_pins.grid_display()
 
