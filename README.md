@@ -2,12 +2,12 @@
 
 Design & display any public & private repository pin visualizations for GitHub user & organization profiles with:
 
-* custom dynamic ordering
-* custom selection of any public and (authorized) private repository
-* custom themes - select from [existing](https://github.com/profile-icons/readme-repo-pins/blob/main/files/themes.json), or [create your own](https://github.com/profile-icons/readme-repo-pins/issues/1)
-* custom background imagery - URL or filepath
-* automatic i18n translations (using [facebook/nllb-200-distilled-600M](https://huggingface.co/facebook/nllb-200-distilled-600M)) - may require cache refresh
+* (optional) dynamic ordering
+* (optional) selection of any public and (authorized) private repository
+* (optional) themes - select from [existing](https://github.com/profile-icons/readme-repo-pins/blob/main/files/themes.json), or [create your own](https://github.com/profile-icons/readme-repo-pins/issues/1)
+* (optional) background imagery - URL or filepath
 * (optional) user contribution statistics 
+* auto i18n translations (using [optimum/m2m100_418M](https://huggingface.co/optimum/m2m100_418M) and [TigreGotico/nllb-200-distilled-600M-onnx](https://huggingface.co/TigreGotico/nllb-200-distilled-600M-onnx))
 
 Pins for private repositories automatically link to deployed public Pages if the link is set to the repository.
 

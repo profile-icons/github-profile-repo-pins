@@ -2,7 +2,7 @@ from gh_profile_repo_pins.repo_pins_img.repo_pins_img_theme import (
     RepoPinImgTheme,
     ThemeSVG,
 )
-from gh_profile_repo_pins.repo_pins_img.repo_pins_img_nlp import RepoPinImgTranslator
+from gh_profile_repo_pins.repo_pins_img.repo_pins_img_i18n import RepoPinImgTranslator
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_data import RepoPinImgData
 import gh_profile_repo_pins.repo_pins_enum as enums
 
@@ -440,7 +440,7 @@ class RepoPinImg:
                 f'y="{(description_y + self.__DESC_SIZE) + (i * self.__DESC_LINE_H):.2f}" '
                 f'font-size="{self.__DESC_SIZE}" '
                 f'fill="var(--text)" '
-                f'{"direction=\"rtl\" text-anchor=\"end\" " if is_rtl else ""}'
+                f'{'direction="rtl" unicode-bidi="plaintext" text-anchor="start" ' if is_rtl else ""}'
                 f">"
                 f"{self.__format_svg_txt(txt=line)}"
                 f"</text>"
@@ -927,13 +927,14 @@ def tst_svg_render(
             enums.RepoPinsResDictKeys.OWNER.value: {
                 enums.RepoPinsResDictKeys.LOGIN.value: "profile-icons"
             },
-            enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
-            "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
-            "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris "
-            "nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in "
-            "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
-            "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
-            "culpa qui officia deserunt mollit anim id est laborum.",
+            enums.RepoPinsResDictKeys.DESCRIPTION.value: "hello, I am Adam",
+            # enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
+            # "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
+            # "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris "
+            # "nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in "
+            # "reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla "
+            # "pariatur. Excepteur sint occaecat cupidatat non proident, sunt in "
+            # "culpa qui officia deserunt mollit anim id est laborum.",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/profile-icons/readme-repo-pins",
             enums.RepoPinsResDictKeys.URL_CUSTOM.value: "https://github.com/FALSE/FALSE",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {
@@ -986,8 +987,9 @@ def tst_svg_render(
             enums.RepoPinsResDictKeys.OWNER.value: {
                 enums.RepoPinsResDictKeys.LOGIN.value: test_username
             },
-            enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
-            "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            enums.RepoPinsResDictKeys.DESCRIPTION.value: "No. No latin is found here.",
+            # enums.RepoPinsResDictKeys.DESCRIPTION.value: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
+            # "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/FALSE/FALSE",
             enums.RepoPinsResDictKeys.URL_CUSTOM.value: f"https://github.com/{test_username}/{test_username}",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {
@@ -1019,7 +1021,7 @@ def tst_svg_render(
             enums.RepoPinsResDictKeys.OWNER.value: {
                 enums.RepoPinsResDictKeys.LOGIN.value: "profile-icons"
             },
-            enums.RepoPinsResDictKeys.DESCRIPTION.value: "",
+            enums.RepoPinsResDictKeys.DESCRIPTION.value: "Why is there no text here?",
             enums.RepoPinsResDictKeys.URL.value: "https://github.com/profile-icons/readme-repo-pins",
             enums.RepoPinsResDictKeys.URL_CUSTOM.value: "",
             enums.RepoPinsResDictKeys.LANGUAGE.value: {},
