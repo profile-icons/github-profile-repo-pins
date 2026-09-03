@@ -954,7 +954,29 @@ class RepoPinImgTranslator:
         },
     }
 
-    __SUPPORTED_LOCALES: tuple[str, ...] = tuple(__STATIC_TRANSLATIONS["public"].keys())
+    __SUPPORTED_DYNAMIC_LOCALES: tuple[str, ...] = (
+        "en",
+        "sv",
+        "zh",
+        "pt",
+        "ja",
+        "de",
+        "ru",
+        "uk",
+        "es",
+        "fr",
+        "fi",
+        "tr",
+        "ko",
+        "pl",
+        "vi",
+        "nl",
+        "hi",
+        "it",
+        "ar",
+        "he",
+        "th",
+    )
 
     __MODEL_SMALL: str = "optimum/m2m100_418M"
     __MODEL_LARGE: str = "TigreGotico/nllb-200-distilled-600M-onnx"
@@ -1374,14 +1396,14 @@ class RepoPinImgTranslator:
 
         m2m_supported_locales: list[str] = [
             locale
-            for locale in self.__SUPPORTED_LOCALES
+            for locale in self.__SUPPORTED_DYNAMIC_LOCALES
             if locale != input_txt_lang
             and input_txt_lang in self.__M2M_CODES
             and locale in self.__M2M_CODES
         ]
         nllb_supported_locales: list[str] = [
             locale
-            for locale in self.__SUPPORTED_LOCALES
+            for locale in self.__SUPPORTED_DYNAMIC_LOCALES
             if locale != input_txt_lang and locale not in m2m_supported_locales
         ]
 
