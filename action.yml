@@ -92,7 +92,7 @@ runs:
         IS_EXCLUDE_REPOS_OWNED: ${{ inputs.is_exclude_repos_owned }}
         IS_EXCLUDE_REPOS_CONTRIBUTED: ${{ inputs.is_exclude_repos_contributed }}
         IS_CONTRIBUTION_STATS: ${{ inputs.is_contribution_stats }}
-        IS_TRANSLATE: ${{ inputs.i18n }}
+        IS_TRANSLATE: ${{ inputs.is_i18n }}
         IS_NLLB: ${{ inputs.is_nllb }}
         HF_TOKEN: ${{ inputs.hf_token }}
       run: |
