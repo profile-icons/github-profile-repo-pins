@@ -57,9 +57,6 @@ Insert the following placeholder into the repository profile `README.md` where y
 
 ```markdown
 <!-- START: REPO-PINS -->
-[![profile-icons/github-profile-repo-pins pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/0.svg)](https://github.com/profile-icons/github-profile-repo-pins) [![uni-projects-demos/ai-quarto-3d pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/1.svg)](https://github.com/uni-projects-demos/ai-quarto-3d) 
-[![profile-icons/github-profile-readme-site pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/2.svg)](https://github.com/profile-icons/github-profile-readme-site) [![profile-icons/github-stats-mod pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/3.svg)](https://github.com/profile-icons/github-stats-mod) 
-[![uni-projects-demos/atari-model-arena-ui pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/4.svg)](https://github.com/uni-projects-demos/atari-model-arena-ui) [![dna-kit-ancestry pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/5.svg)](https://github.com/r055a/dna-kit-ancestry) 
 <!-- END: REPO-PINS -->
 ```
 
