@@ -96,6 +96,9 @@ class RepoPinsResDictKeys(Enum):
     OWNER_REPO = "nameWithOwner"
     STARS = "stargazerCount"
     CONTRIBUTION = "contribution_data"
+    CONTRIBUTORS = "contributors"
+    CONTRIBUTIONS = "contributions"
+    AVATAR_URL = "avatar_url"
     STATS = "stats"
     FORK_COUNT = "forkCount"
     ISSUES = "issues"
@@ -120,7 +123,7 @@ class RepoPinsResDictKeys(Enum):
 
 
 def update_enum(enum_cls: type[Enum], enum_dict: dict[str, str]) -> None:
-    updated_enum: Enum = Enum(
+    updated_enum: type[Enum] = Enum(  # type: ignore[misc]
         enum_cls.__name__,
         {**{m.name: m.value for m in enum_cls}, **enum_dict},
         type=str,

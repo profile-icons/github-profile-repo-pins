@@ -3,6 +3,13 @@ from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
 import gh_profile_repo_pins.repo_pins_enum as enums
 from dataclasses import dataclass
 from urllib.parse import urlparse
+from typing import Any
+
+
+@dataclass(frozen=True)
+class RepoPinContributor:
+    login: str
+    img: RepoPinImgMedia
 
 
 @dataclass(frozen=True)
@@ -14,7 +21,9 @@ class RepoPinImgData:
     issue_help_count: int
     pull_request_count: int
     contributor_count: int
-    contribution_perc: float
+    contribution_perc: float | int
+    top_contributors: tuple[RepoPinContributor, ...]
+    user_top_contributor_idx: int | None
     description: str
     url: str
     primary_language_name: str
@@ -43,7 +52,7 @@ class RepoPinImgData:
     @classmethod
     def format_repo_pin_data(
         cls,
-        repo_data: dict,
+        repo_data: dict[str, Any],
         user_repo_owner: str,
         login_username: str,
         login_user_name: str,
@@ -72,7 +81,7 @@ class RepoPinImgData:
         )
 
         try:
-            bg_img = (
+            bg_img_media: RepoPinImgMedia | None = (
                 (
                     RepoPinImgMedia(**bg_img)
                     if isinstance(bg_img, dict)
@@ -89,52 +98,126 @@ class RepoPinImgData:
         except ValueError as err:
             raise RepoPinImageMediaError(msg=f"Background image error: {str(err)}")
 
+        contribution_data_list: list[dict] = (
+            repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTION.value, []) or []
+        )
         contributions: dict[str, int] = {
-            data.get(enums.RepoPinsResDictKeys.LOGIN.value).strip(): data.get(
-                enums.RepoPinsResDictKeys.STATS.value, 0
+            str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "").strip(): (
+                data.get(enums.RepoPinsResDictKeys.STATS.value, 0) or 0
             )
-            for data in (
-                repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTION.value, []) or []
-            )
-            if (data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "") != ""
+            for data in contribution_data_list
+            if str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "").strip()
         }
 
+        github_contributors: list[dict] = (
+            repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTORS.value, []) or []
+        )
+        if not github_contributors:
+            github_contributors = [
+                data
+                for data in contribution_data_list
+                if data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
+            ]
+
+        github_contributors = sorted(
+            [
+                data
+                for data in github_contributors
+                if str(
+                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+                ).strip()
+            ],
+            key=lambda data: int(
+                data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0
+            ),
+            reverse=True,
+        )
+        avatar_contributor_data = [
+            data
+            for data in github_contributors
+            if data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
+        ]
+        top_contributor_data = avatar_contributor_data[:3]
+        top_contributors: tuple[RepoPinContributor, ...] = tuple(
+            RepoPinContributor(
+                login=str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "")).strip(),
+                img=RepoPinImgMedia(
+                    img=str(data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)),
+                    opacity=1.0,
+                ),
+            )
+            for data in top_contributor_data
+        )
+        login_username_norm = (login_username or "").strip().casefold()
+        user_top_contributor_idx: int | None = next(
+            (
+                i
+                for i, data in enumerate(avatar_contributor_data)
+                if str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "")
+                .strip()
+                .casefold()
+                == login_username_norm
+            ),
+            None,
+        )
+
+        login_user_name_norm = (login_user_name or "").strip().casefold()
         contribution_perc: float = 0
-        for contribution_data in (
-            repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTION.value, []) or []
-        ):
-            if (
-                login_user_name  # real name, if using any
-                in contribution_data.get(enums.RepoPinsResDictKeys.AUTHOR.value, [])
-                or login_username  # username, incase not including a real name or not using it and username instead
-                in contribution_data.get(enums.RepoPinsResDictKeys.AUTHOR.value, [])
-                or f"{login_user_id}+{login_username}@users.noreply.github.com"  # GitHub email associated with account
-                in contribution_data.get(enums.RepoPinsResDictKeys.EMAIL.value, [])
-                or any(
-                    [
-                        email
-                        for email in contribution_data.get(
-                            enums.RepoPinsResDictKeys.EMAIL.value, []
-                        )
-                        if email.strip().startswith(f"{login_user_id}+")
-                        and email.strip().endswith(
-                            "@users.noreply.github.com"
-                        )  # if changed name, fallback to ID in email
-                    ]
+        total_contributions = sum(contributions.values())
+        for contribution_data in contribution_data_list:
+            authors = {
+                str(author).strip().casefold()
+                for author in contribution_data.get(
+                    enums.RepoPinsResDictKeys.AUTHOR.value, []
                 )
-            ):
-                user_contributions: float = contributions.get(
-                    contribution_data.get(
-                        enums.RepoPinsResDictKeys.LOGIN.value
-                    ).strip(),
-                    0,
+            }
+            emails = {
+                str(email).strip().casefold()
+                for email in contribution_data.get(
+                    enums.RepoPinsResDictKeys.EMAIL.value, []
                 )
-                contribution_perc = (
-                    user_contributions
-                    / sum([v for _, v in contributions.items()])
-                    * 100
+                if email
+            }
+            account_noreply_email = (
+                f"{login_user_id}+{login_username_norm}@users.noreply.github.com"
+                if login_user_id is not None
+                else ""
+            )
+            is_user = (
+                (bool(login_user_name_norm) and login_user_name_norm in authors)
+                or (bool(login_username_norm) and login_username_norm in authors)
+                or (bool(account_noreply_email) and account_noreply_email in emails)
+                or (
+                    login_user_id is not None
+                    and any(
+                        email.startswith(f"{login_user_id}+")
+                        and email.endswith("@users.noreply.github.com")
+                        for email in emails
+                    )
                 )
+            )
+            if is_user:
+                contributor_key = str(
+                    contribution_data.get(enums.RepoPinsResDictKeys.LOGIN.value, "")
+                    or ""
+                ).strip()
+                user_contributions: float = contributions.get(contributor_key, 0)
+                if total_contributions:
+                    contribution_perc = user_contributions / total_contributions * 100
                 break
+
+        github_contributor_count = len(
+            {
+                str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "")
+                .strip()
+                .casefold()
+                for data in github_contributors
+                if str(
+                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+                ).strip()
+            }
+        )
+        contributor_count = github_contributor_count or len(contributions)
 
         return RepoPinImgData(
             repo_name=(
@@ -159,8 +242,10 @@ class RepoPinImgData:
                 repo_data.get(enums.RepoPinsResDictKeys.PULL_REQUESTS.value, {}) or {}
             ).get(enums.RepoPinsResDictKeys.TTL_COUNT.value, 0)
             or 0,
-            contributor_count=len(list(contributions.keys())),
+            contributor_count=contributor_count,
             contribution_perc=contribution_perc,
+            top_contributors=top_contributors,
+            user_top_contributor_idx=user_top_contributor_idx,
             description=repo_data.get(enums.RepoPinsResDictKeys.DESCRIPTION.value, "")
             or "",
             url=(
@@ -207,11 +292,11 @@ class RepoPinImgData:
                 if theme_name
                 else (
                     enums.RepoPinsImgThemeName.BG_IMG_CONTRAST
-                    if bg_img
+                    if bg_img_media
                     else enums.RepoPinsImgThemeName.GITHUB_SOFT
                 )
             ),
-            bg_img=bg_img,
+            bg_img=bg_img_media,
             user_img=RepoPinImgMedia(
                 img=f"https://avatars.githubusercontent.com/u/{login_user_id}?v=4",
                 opacity=1.0,

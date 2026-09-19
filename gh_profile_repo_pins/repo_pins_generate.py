@@ -1,22 +1,24 @@
-from gh_profile_repo_pins.utils import (
+from utils.utils import (
     write_svg,
     del_imgs,
     update_md_file,
     load_themes,
+    Logger,
+    get_logger,
     get_md_grid_pin_str,
 )
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_data import RepoPinImgData
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageThemeError
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_svg import RepoPinImg
-from gh_profile_repo_pins.utils import Logger, get_logger
 import gh_profile_repo_pins.repo_pins_enum as enums
+from typing import Any
 
 
 class GenerateRepoPins:
 
     def __init__(
         self,
-        repo_pins_data: list[dict[str, str | int | bool | dict[str, str]]],
+        repo_pins_data: list[dict[str, Any]],
         user_repo_owner: str,
         login_username: str,
         login_user_name: str,
@@ -28,7 +30,7 @@ class GenerateRepoPins:
         is_nllb_trans: bool = False,
     ) -> None:
         self.__log: Logger = get_logger()
-        self.update_themes()  # update the database with any new json themes not in enums.RepoPinsImgThemeName
+        self.update_themes()  # update the database with any new JSON themes not in enums.RepoPinsImgThemeName
         self.__is_translate: bool = is_translate
         self.__is_nllb_trans: bool = is_nllb_trans
         self.__is_org: bool = is_org
@@ -55,13 +57,15 @@ class GenerateRepoPins:
         self, repo_data: dict | str | None, repo_data_i: dict
     ) -> str | None:
         if repo_data and isinstance(repo_data, dict):
+            repo_name = repo_data_i.get(enums.RepoPinsResDictKeys.NAME.value)
+            repo_url = repo_data_i.get(enums.RepoPinsResDictKeys.URL.value)
+            if not isinstance(repo_name, str) or not isinstance(repo_url, str):
+                return None
             repo_img_key: list[str] = [
-                k
+                str(k)
                 for k in repo_data.keys()
-                if repo_data_i.get(enums.RepoPinsResDictKeys.NAME.value).lower()
-                in k.lower()
-                and k.lower()
-                in (repo_data_i.get(enums.RepoPinsResDictKeys.URL.value) or "").lower()
+                if repo_name.lower() in str(k).lower()
+                and str(k).lower() in repo_url.lower()
             ]
             return repo_img_key[0] if repo_img_key else None
         return None
@@ -72,8 +76,10 @@ class GenerateRepoPins:
         repo_theme_key: str | None = self.__get_repo_data_key(
             repo_data=theme, repo_data_i=repo_data_i
         )
-        if theme and repo_theme_key:
-            return enums.RepoPinsImgThemeName(theme[repo_theme_key])
+        if isinstance(theme, dict) and repo_theme_key:
+            theme_value = theme.get(repo_theme_key)
+            if isinstance(theme_value, str):
+                return enums.RepoPinsImgThemeName(theme_value)
         elif theme and not isinstance(theme, dict):
             return enums.RepoPinsImgThemeName(theme)
         return None
@@ -85,12 +91,11 @@ class GenerateRepoPins:
             repo_img_key: str | None = self.__get_repo_data_key(
                 repo_data=bg_img, repo_data_i=repo_data_i
             )
-            if (
-                repo_img_key
-                and isinstance(bg_img.get(repo_img_key), dict)
-                and bg_img.get(repo_img_key).get(enums.RepoPinsResDictKeys.IMG.value)
+            repo_img_data = bg_img.get(repo_img_key) if repo_img_key else None
+            if isinstance(repo_img_data, dict) and repo_img_data.get(
+                enums.RepoPinsResDictKeys.IMG.value
             ):
-                return bg_img.get(repo_img_key)
+                return repo_img_data
             elif (
                 bg_img.values()
                 and not isinstance(list(bg_img.values())[0], dict)

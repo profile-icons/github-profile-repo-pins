@@ -1,7 +1,7 @@
 from lingua import LanguageDetectorBuilder, LanguageDetector, Language, IsoCode639_1
 from transformers import AutoTokenizer, PreTrainedTokenizerBase, BatchEncoding
-from gh_profile_repo_pins.utils import Logger, get_logger
 from optimum.onnxruntime import ORTModelForSeq2SeqLM
+from utils.utils import Logger, get_logger
 
 
 class RepoPinImgTranslator:

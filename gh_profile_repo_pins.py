@@ -1,4 +1,4 @@
-from gh_profile_repo_pins.utils import parse_args, get_logger, Logger
+from utils.utils import parse_args, get_logger, Logger
 from gh_profile_repo_pins.repo_pins import ReadMeRepoPins
 
 

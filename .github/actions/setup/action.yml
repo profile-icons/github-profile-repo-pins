@@ -1,14 +1,10 @@
 name: setup-py
-description: Reusable action for setting up a Python environment with pip requirements install
+description: Reusable action for setting up a Python environment with pip pyproject.toml install
 
 inputs:
   py-version:
     description: Python version
     default: '3.14'
-
-  pip-requirements:
-    description: Pip requirements path
-    default: 'requirements.txt'
 
 runs:
   using: composite
@@ -24,4 +20,4 @@ runs:
         PIP_DISABLE_PIP_VERSION_CHECK: '1'
       run: |
         python -m pip install --upgrade pip
-        pip install -r "${{ inputs.pip-requirements }}"
+        pip install -e ".[dev]"

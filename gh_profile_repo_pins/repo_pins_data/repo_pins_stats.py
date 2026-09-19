@@ -6,6 +6,7 @@ from re import compile, I, Pattern
 from tempfile import mkdtemp
 from shutil import rmtree
 from os import environ
+from typing import Any
 
 
 class RepoPinStats:
@@ -26,8 +27,8 @@ class RepoPinStats:
     )
     __NUMSTAT_REG: Pattern = compile(pattern=r"^\d+\t\d+\t")
 
-    def __init__(self, gh_token: str = None) -> None:
-        self.__gh_token: str = gh_token
+    def __init__(self, gh_token: str | None = None) -> None:
+        self.__gh_token: str | None = gh_token
 
     def __get_completed_process(self, args: list[str]) -> CompletedProcess[str]:
         env = environ.copy()
@@ -83,19 +84,15 @@ class RepoPinStats:
             else None
         )
 
-    def __fetch_repo_stats(
-        self, owner_repo: str
-    ) -> list[dict[str, str | dict[str, int]]]:
+    def __fetch_repo_stats(self, owner_repo: str) -> list[dict[str, Any]]:
         url: str = (
             f"https://{(self.__gh_token + "@") if self.__gh_token else ""}github.com/{owner_repo}.git"
         )
         tmp_dir: str = mkdtemp(prefix=self.__TMP_DIR)
 
-        repo_file_changes_add, repo_file_changes_del, commit_log_author_emails = (
-            {},
-            {},
-            {},
-        )
+        repo_file_changes_add: dict[str, int] = {}
+        repo_file_changes_del: dict[str, int] = {}
+        commit_log_author_emails: dict[str, dict[str, set[Any]]] = {}
         try:
             commit_data: CompletedProcess[str] | None = self.__fetch_git_commit_data(
                 url=url, tmp_dir=tmp_dir
@@ -142,8 +139,7 @@ class RepoPinStats:
                                     enums.RepoPinsResDictKeys.EMAIL.value, set()
                                 ):
                                     if commit_log_email == commit_email:
-                                        if len(commit_log_author) > len(commit_author):
-                                            commit_author_key = commit_log_author
+                                        commit_author_key = commit_log_author
                                         is_email_match = True
                                         break
                                 if is_email_match:
@@ -203,7 +199,9 @@ class RepoPinStats:
             for commit_author in commit_authors
         ]
 
-    def fetch_contribution_stats(self, repo_list: list[dict]) -> list[dict]:
+    def fetch_contribution_stats(
+        self, repo_list: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         tasks: list[tuple[str, dict]] = []
         for repo in repo_list:
             url_tokens: list[str] = (

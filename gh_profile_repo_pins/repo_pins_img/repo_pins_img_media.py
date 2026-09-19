@@ -1,9 +1,9 @@
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
 import gh_profile_repo_pins.repo_pins_enum as enums
-from gh_profile_repo_pins.utils import load_img
 from PIL import Image as im, ImageOps as im_ops
 from requests import get, Response, HTTPError
 from urllib.parse import urlparse
+from utils.utils import load_img
 from base64 import b64encode
 from io import BytesIO
 
@@ -135,12 +135,12 @@ class RepoPinImgMedia:
             )
 
         try:
-            self.__img = load_img(img_path=self.__img)
+            byte_img: bytes = load_img(img_path=self.__img)
         except FileNotFoundError:
             raise RepoPinImageMediaError(msg=f"Image file not found: {self.__img}")
         self.__set_encoded_url(
             encoded_url=b64encode(
-                s=self.__format_encoded_img(byte_img=self.__img)
+                s=self.__format_encoded_img(byte_img=byte_img)
             ).decode(encoding=self.__BASE_64_ENCODING)
         )
 

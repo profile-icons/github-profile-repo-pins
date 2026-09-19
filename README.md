@@ -1,6 +1,6 @@
 # GitHub Profile Repository Pins
 
-Design & display any public & private repository pin visualizations for GitHub user & organization profiles with:
+Generate configurable public/private repository pin visualizations for GitHub user & organization profiles with:
 
 * (optional) dynamic ordering
 * (optional) selection of any public and (authorized) private repository
@@ -57,6 +57,9 @@ Insert the following placeholder into the repository profile `README.md` where y
 
 ```markdown
 <!-- START: REPO-PINS -->
+[![profile-icons/github-profile-repo-pins pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/0.svg)](https://github.com/profile-icons/github-profile-repo-pins) [![uni-projects-demos/ai-quarto-3d pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/1.svg)](https://github.com/uni-projects-demos/ai-quarto-3d) 
+[![profile-icons/github-profile-readme-site pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/2.svg)](https://github.com/profile-icons/github-profile-readme-site) [![profile-icons/github-stats-mod pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/3.svg)](https://github.com/profile-icons/github-stats-mod) 
+[![uni-projects-demos/atari-model-arena-ui pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/4.svg)](https://github.com/uni-projects-demos/atari-model-arena-ui) [![dna-kit-ancestry pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/5.svg)](https://github.com/r055a/dna-kit-ancestry) 
 <!-- END: REPO-PINS -->
 ```
 
@@ -392,3 +395,33 @@ This can be set by creating a [GitHub Action](https://docs.github.com/en/actions
 where:
 * `hf_token` is a unique token code generated from a personal HuggingFace account - optional `[]`
 </details>
+
+## Local Development
+
+### Install
+
+```bash
+pip install -e ".[dev]"
+```
+
+### Test
+
+Test themes, backgrounds and SVG rendering. Images are saved to `repo_pin_imgs/`
+
+```bash
+python -m gh_profile_repo_pins.repo_pins_img.repo_pins_img_svg [OPTIONS]
+```
+
+### Run
+
+```bash
+python gh_profile_repo_pins.py
+```
+
+## Contribute
+
+Before making a Pull Request, ensure it addresses an Issue, and verify the branch passes:
+
+```bash
+code-verify
+```

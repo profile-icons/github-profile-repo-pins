@@ -5,14 +5,16 @@
       "border": "#d1d9e0",
       "text": "#59636e",
       "link": "#0969da",
-      "danger": "#9a6700"
+      "danger": "#9a6700",
+      "user_border": "#0969da"
     },
     "dark": {
       "canvas": "#0d1117",
       "border": "#3d444d",
       "text": "#9198a1",
       "link": "#4493f8",
-      "danger": "#d29922"
+      "danger": "#d29922",
+      "user_border": "#4493f8"
     }
   },
   "github_soft": {
@@ -21,14 +23,16 @@
       "border": "#d1d9e0",
       "text": "#59636e",
       "link": "#0969da",
-      "danger": "#9a6700"
+      "danger": "#9a6700",
+      "user_border": "#0969da"
     },
     "dark": {
       "canvas": "#212830",
       "border": "#3d444d",
       "text": "#9198a1",
       "link": "#478be6",
-      "danger": "#c69026"
+      "danger": "#c69026",
+      "user_border": "#478be6"
     }
   },
   "dracula": {
@@ -37,14 +41,16 @@
       "border": "#44475a",
       "text": "#f8f8f2",
       "link": "#bd93f9",
-      "danger": "#ff5555"
+      "danger": "#ff5555",
+      "user_border": "#bd93f9"
     },
     "dark": {
       "canvas": "#282a36",
       "border": "#44475a",
       "text": "#f8f8f2",
       "link": "#bd93f9",
-      "danger": "#ff5555"
+      "danger": "#ff5555",
+      "user_border": "#bd93f9"
     }
   },
   "bg_img_contrast": {
@@ -53,14 +59,16 @@
       "border": "#dadce0",
       "text": "#202124",
       "link": "#0969da",
-      "danger": "#ff6b6b"
+      "danger": "#ff6b6b",
+      "user_border": "#0969da"
     },
     "dark": {
       "canvas": "#212830",
       "border": "#3a3a3a",
       "text": "#e4e6eb",
       "link": "#58a6ff",
-      "danger": "#ff6b6b"
+      "danger": "#ff6b6b",
+      "user_border": "#58a6ff"
     }
   },
   "nord": {
@@ -69,14 +77,16 @@
       "border": "#d8dee9",
       "text": "#4c566a",
       "link": "#5e81ac",
-      "danger": "#bf616a"
+      "danger": "#bf616a",
+      "user_border": "#5e81ac"
     },
     "dark": {
       "canvas": "#2e3440",
       "border": "#4c566a",
       "text": "#d8dee9",
       "link": "#88c0d0",
-      "danger": "#bf616a"
+      "danger": "#bf616a",
+      "user_border": "#88c0d0"
     }
   },
   "ayu": {
@@ -85,14 +95,16 @@
       "border": "#d2d4d8",
       "text": "#5c6166",
       "link": "#399ee6",
-      "danger": "#f07171"
+      "danger": "#f07171",
+      "user_border": "#399ee6"
     },
     "dark": {
       "canvas": "#0d1017",
       "border": "#1f2430",
       "text": "#bfbdb6",
       "link": "#59c2ff",
-      "danger": "#d95757"
+      "danger": "#d95757",
+      "user_border": "#59c2ff"
     }
   },
   "catppuccin": {
@@ -101,14 +113,16 @@
       "border": "#dce0e8",
       "text": "#4c4f69",
       "link": "#1e66f5",
-      "danger": "#d20f39"
+      "danger": "#d20f39",
+      "user_border": "#1e66f5"
     },
     "dark": {
       "canvas": "#1e1e2e",
       "border": "#45475a",
       "text": "#cdd6f4",
       "link": "#89b4fa",
-      "danger": "#f38ba8"
+      "danger": "#f38ba8",
+      "user_border": "#89b4fa"
     }
   },
   "cobalt2": {
@@ -117,14 +131,16 @@
       "border": "#d3dae3",
       "text": "#193549",
       "link": "#0066cc",
-      "danger": "#e91e63"
+      "danger": "#e91e63",
+      "user_border": "#0066cc"
     },
     "dark": {
       "canvas": "#193549",
       "border": "#2d5a7b",
       "text": "#ffffff",
       "link": "#0088ff",
-      "danger": "#ff0088"
+      "danger": "#ff0088",
+      "user_border": "#0088ff"
     }
   },
   "everforest": {
@@ -133,14 +149,16 @@
       "border": "#e6e2cc",
       "text": "#5c6a72",
       "link": "#8da101",
-      "danger": "#f85552"
+      "danger": "#f85552",
+      "user_border": "#8da101"
     },
     "dark": {
       "canvas": "#2d353b",
       "border": "#3d484d",
       "text": "#d3c6aa",
       "link": "#a7c080",
-      "danger": "#e67e80"
+      "danger": "#e67e80",
+      "user_border": "#a7c080"
     }
   },
   "github_high_contrast": {
@@ -149,14 +167,16 @@
       "border": "#20252c",
       "text": "#0e1116",
       "link": "#0349b4",
-      "danger": "#a0111f"
+      "danger": "#a0111f",
+      "user_border": "#0349b4"
     },
     "dark": {
       "canvas": "#0a0c10",
       "border": "#7a828e",
       "text": "#f0f3f6",
       "link": "#71b7ff",
-      "danger": "#ff9492"
+      "danger": "#ff9492",
+      "user_border": "#71b7ff"
     }
   },
   "gruvbox": {
@@ -165,14 +185,16 @@
       "border": "#ebdbb2",
       "text": "#3c3836",
       "link": "#076678",
-      "danger": "#9d0006"
+      "danger": "#9d0006",
+      "user_border": "#076678"
     },
     "dark": {
       "canvas": "#282828",
       "border": "#3c3836",
       "text": "#ebdbb2",
       "link": "#83a598",
-      "danger": "#fb4934"
+      "danger": "#fb4934",
+      "user_border": "#83a598"
     }
   },
   "horizon": {
@@ -181,14 +203,16 @@
       "border": "#fadad1",
       "text": "#1c1e26",
       "link": "#1d8991",
-      "danger": "#da103f"
+      "danger": "#da103f",
+      "user_border": "#1d8991"
     },
     "dark": {
       "canvas": "#1c1e26",
       "border": "#2e303e",
       "text": "#fdf0ed",
       "link": "#25b2bc",
-      "danger": "#e95678"
+      "danger": "#e95678",
+      "user_border": "#25b2bc"
     }
   },
   "kanagawa": {
@@ -197,14 +221,16 @@
       "border": "#d8cfc4",
       "text": "#54433a",
       "link": "#2d4f67",
-      "danger": "#e82424"
+      "danger": "#e82424",
+      "user_border": "#2d4f67"
     },
     "dark": {
       "canvas": "#1f1f28",
       "border": "#2a2a37",
       "text": "#dcd7ba",
       "link": "#7e9cd8",
-      "danger": "#e82424"
+      "danger": "#e82424",
+      "user_border": "#7e9cd8"
     }
   },
   "material": {
@@ -213,14 +239,16 @@
       "border": "#e0e0e0",
       "text": "#263238",
       "link": "#6182b8",
-      "danger": "#e53935"
+      "danger": "#e53935",
+      "user_border": "#6182b8"
     },
     "dark": {
       "canvas": "#263238",
       "border": "#37474f",
       "text": "#eeffff",
       "link": "#82aaff",
-      "danger": "#f07178"
+      "danger": "#f07178",
+      "user_border": "#82aaff"
     }
   },
   "monokai": {
@@ -229,14 +257,16 @@
       "border": "#ded6c8",
       "text": "#292318",
       "link": "#bf7bff",
-      "danger": "#e54b4b"
+      "danger": "#e54b4b",
+      "user_border": "#bf7bff"
     },
     "dark": {
       "canvas": "#272822",
       "border": "#3e3d32",
       "text": "#f8f8f2",
       "link": "#ae81ff",
-      "danger": "#f92672"
+      "danger": "#f92672",
+      "user_border": "#ae81ff"
     }
   },
   "night_owl": {
@@ -245,14 +275,16 @@
       "border": "#d9d9d9",
       "text": "#403f53",
       "link": "#4876d6",
-      "danger": "#de3d3b"
+      "danger": "#de3d3b",
+      "user_border": "#4876d6"
     },
     "dark": {
       "canvas": "#011627",
       "border": "#1d3b53",
       "text": "#d6deeb",
       "link": "#82aaff",
-      "danger": "#ef5350"
+      "danger": "#ef5350",
+      "user_border": "#82aaff"
     }
   },
   "one_dark": {
@@ -261,14 +293,16 @@
       "border": "#d7dae0",
       "text": "#383a42",
       "link": "#4078f2",
-      "danger": "#e45649"
+      "danger": "#e45649",
+      "user_border": "#4078f2"
     },
     "dark": {
       "canvas": "#282c34",
       "border": "#3e4451",
       "text": "#abb2bf",
       "link": "#61afef",
-      "danger": "#e06c75"
+      "danger": "#e06c75",
+      "user_border": "#61afef"
     }
   },
   "palenight": {
@@ -277,14 +311,16 @@
       "border": "#d9dde6",
       "text": "#292d3e",
       "link": "#4976eb",
-      "danger": "#e53935"
+      "danger": "#e53935",
+      "user_border": "#4976eb"
     },
     "dark": {
       "canvas": "#292d3e",
       "border": "#3c4055",
       "text": "#a6accd",
       "link": "#82aaff",
-      "danger": "#f07178"
+      "danger": "#f07178",
+      "user_border": "#82aaff"
     }
   },
   "rose_pine": {
@@ -293,14 +329,16 @@
       "border": "#dfdad9",
       "text": "#575279",
       "link": "#31748f",
-      "danger": "#b4637a"
+      "danger": "#b4637a",
+      "user_border": "#31748f"
     },
     "dark": {
       "canvas": "#191724",
       "border": "#403d52",
       "text": "#e0def4",
       "link": "#9ccfd8",
-      "danger": "#eb6f92"
+      "danger": "#eb6f92",
+      "user_border": "#9ccfd8"
     }
   },
   "solarized": {
@@ -309,14 +347,16 @@
       "border": "#eee8d5",
       "text": "#657b83",
       "link": "#268bd2",
-      "danger": "#dc322f"
+      "danger": "#dc322f",
+      "user_border": "#268bd2"
     },
     "dark": {
       "canvas": "#002b36",
       "border": "#073642",
       "text": "#839496",
       "link": "#268bd2",
-      "danger": "#dc322f"
+      "danger": "#dc322f",
+      "user_border": "#268bd2"
     }
   },
   "synthwave_84": {
@@ -325,14 +365,16 @@
       "border": "#e0e0e0",
       "text": "#262335",
       "link": "#00bcd4",
-      "danger": "#f44336"
+      "danger": "#f44336",
+      "user_border": "#00bcd4"
     },
     "dark": {
       "canvas": "#262335",
       "border": "#495495",
       "text": "#ffffff",
       "link": "#36f9f6",
-      "danger": "#fe4450"
+      "danger": "#fe4450",
+      "user_border": "#36f9f6"
     }
   },
   "tokyo_night": {
@@ -341,14 +383,16 @@
       "border": "#c4c8da",
       "text": "#273153",
       "link": "#2e7de9",
-      "danger": "#c94060"
+      "danger": "#c94060",
+      "user_border": "#2e7de9"
     },
     "dark": {
       "canvas": "#1a1b26",
       "border": "#292e42",
       "text": "#c0caf5",
       "link": "#7aa2f7",
-      "danger": "#f7768e"
+      "danger": "#f7768e",
+      "user_border": "#7aa2f7"
     }
   },
   "tomorrow": {
@@ -357,14 +401,16 @@
       "border": "#d6d6d6",
       "text": "#4d4d4c",
       "link": "#4271ae",
-      "danger": "#c82829"
+      "danger": "#c82829",
+      "user_border": "#4271ae"
     },
     "dark": {
       "canvas": "#1d1f21",
       "border": "#373b41",
       "text": "#c5c8c6",
       "link": "#81a2be",
-      "danger": "#cc6666"
+      "danger": "#cc6666",
+      "user_border": "#81a2be"
     }
   }
 }

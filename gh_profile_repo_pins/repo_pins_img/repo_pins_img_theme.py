@@ -1,6 +1,6 @@
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageThemeError
 import gh_profile_repo_pins.repo_pins_enum as enums
-from gh_profile_repo_pins.utils import load_themes
+from utils.utils import load_themes
 from dataclasses import dataclass
 
 
@@ -11,11 +11,14 @@ class ThemeSVG:
     text: str  # description text
     danger: str  # archive text/badge
     link: str  # hyperlink text (repo name)
+    user_border: str | None = None  # highlighted user avatar border
 
     def __repr__(self) -> str:
+        user_border = self.user_border or self.link
         return f""":root {{
               --canvas: {self.canvas}; --border: {self.border}; 
               --text: {self.text}; --danger: {self.danger}; --link: {self.link};
+              --user-border: {user_border};
             }}"""
 
 
@@ -47,12 +50,9 @@ class RepoPinImgTheme:
                 msg=f"Theme '{theme_name.value}' is not found in the database."
             )
 
-        self.__svg_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] | None = (
-            svg_themes_db.get(
-                enums.RepoPinsImgThemeName(theme_name),
-                svg_themes_db.get(theme_name),
-            )
-        )
+        self.__svg_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] = svg_themes_db[
+            theme_name
+        ]
         if (
             not self.__svg_theme
             or enums.RepoPinsImgThemeMode.LIGHT not in self.__svg_theme
@@ -63,5 +63,5 @@ class RepoPinImgTheme:
             )
 
     @property
-    def svg_theme(self) -> dict[enums.RepoPinsImgThemeMode, ThemeSVG] | None:
+    def svg_theme(self) -> dict[enums.RepoPinsImgThemeMode, ThemeSVG]:
         return self.__svg_theme

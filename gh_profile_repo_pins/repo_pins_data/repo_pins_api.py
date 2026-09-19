@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from threading import local, Lock
 from http import HTTPStatus
 from time import sleep
+from typing import Any, NoReturn
 
 
 @dataclass
@@ -183,7 +184,7 @@ class GitHubApiClient:
 
     def __raise_api_fetch_err(
         self, res: Response, exception: type[BaseException] = GitHubGraphQlClientError
-    ) -> None:
+    ) -> NoReturn:
         raise exception(
             f"{((res.json().get(enums.RepoPinsResDictKeys.ERROR.value) or {})
             .get(enums.RepoPinsResDictKeys.MESSAGE.value))
@@ -201,7 +202,7 @@ class GitHubApiClient:
             )}"
         )
 
-    def __update_fetch_cost(self, res_json: dict = None) -> None:
+    def __update_fetch_cost(self, res_json: dict | None = None) -> None:
         with self.__fetch_cost_update_lock:
             self.__fetch_cost_ttl += (
                 (
@@ -215,7 +216,7 @@ class GitHubApiClient:
                 else 1
             )
 
-    def __post_request(self, body_json: dict) -> dict[str, str | list[str]] | None:
+    def __post_request(self, body_json: dict[str, Any]) -> dict[str, Any]:
         try:
             res: Response = post(
                 self.__GRAPH_QL_URL,
@@ -224,21 +225,14 @@ class GitHubApiClient:
                 timeout=self.__DEFAULT_TIME_OUT,
             )
             if res.status_code == HTTPStatus.OK:
-                res_json: dict[str, str | list[str]] = res.json()
-                if (
-                    res_json.get(enums.RepoPinsResDictKeys.ERROR.value)
-                    and isinstance(
-                        res_json.get(enums.RepoPinsResDictKeys.ERROR.value)[0], dict
-                    )
-                    and res_json.get(enums.RepoPinsResDictKeys.ERROR.value)[0].get(
+                res_json: dict[str, Any] = res.json()
+                errors = res_json.get(enums.RepoPinsResDictKeys.ERROR.value)
+                if isinstance(errors, list) and errors and isinstance(errors[0], dict):
+                    error_message = errors[0].get(
                         enums.RepoPinsResDictKeys.MESSAGE.value
                     )
-                ):
-                    raise Exception(
-                        res_json.get(enums.RepoPinsResDictKeys.ERROR.value)[0].get(
-                            enums.RepoPinsResDictKeys.MESSAGE.value
-                        )
-                    )
+                    if error_message:
+                        raise Exception(error_message)
                 self.__update_fetch_cost(res_json=res_json)
                 return res_json
             elif res.status_code == HTTPStatus.UNAUTHORIZED or not (
@@ -254,7 +248,7 @@ class GitHubApiClient:
             raise GitHubGraphQlClientError(msg=f"API request error: {err}")
 
     def __get_user_config(self, username: str) -> tuple[str, int, str]:
-        res: dict[str, str | list[str]] | None = self.__post_request(
+        res: dict[str, Any] = self.__post_request(
             body_json={
                 "query": self.__GRAPH_QL_USER_DATA_QUERY,
                 "variables": {enums.RepoPinsResDictKeys.LOGIN.value: username},
@@ -282,7 +276,7 @@ class GitHubApiClient:
         )
 
     def __verify_user(self, username: str | None = None) -> tuple[str, str, int, str]:
-        res: dict[str, str | list[str]] | None = self.__post_request(
+        res: dict[str, Any] = self.__post_request(
             body_json={"query": self.__GRAPH_QL_VERIFY_TOKEN_QUERY}
         )
         res_username: str = (
@@ -297,11 +291,11 @@ class GitHubApiClient:
         )
         if not username:
             username = res_username
-        return (username, *self.__get_user_config(username=username))
+        return username, *self.__get_user_config(username=username)
 
     def __get_repo_owner_type(self, repo_owner: str | None) -> str:
         assert repo_owner
-        res: dict[str, str | list[str]] | None = self.__post_request(
+        res: dict[str, Any] = self.__post_request(
             body_json={
                 "query": self.__GRAPH_QL_REPO_OWNER_TYPE_QUERY,
                 "variables": {enums.RepoPinsResDictKeys.LOGIN.value: repo_owner},
@@ -321,9 +315,9 @@ class GitHubApiClient:
         return res_repo_owner_type
 
     def __process_repo_req(
-        self, body_json: dict, repo_data_key: str, is_user_data: bool = True
-    ) -> dict:
-        res_data = (
+        self, body_json: dict[str, Any], repo_data_key: str, is_user_data: bool = True
+    ) -> dict[str, Any]:
+        res_data: dict[str, Any] = (
             self.__post_request(body_json=body_json).get(
                 enums.RepoPinsResDictKeys.DATA.value
             )
@@ -336,9 +330,9 @@ class GitHubApiClient:
         ).get(repo_data_key) or {}
 
     def __paginate_fetch_repo_data(
-        self, body_json: dict, repo_data_key: str, pinned_repo_urls: list
-    ) -> list[dict[str, str | int | dict[str, str]]]:
-        res_node_data: list[dict[str, str | int | dict[str, str]]] = []
+        self, body_json: dict[str, Any], repo_data_key: str, pinned_repo_urls: list[str]
+    ) -> list[dict[str, Any]]:
+        res_node_data: list[dict[str, Any]] = []
         repo_urls: set[str] = set(pinned_repo_urls)
         after: str | None = None
 
@@ -412,7 +406,9 @@ class GitHubApiClient:
             raise GitHubGraphQlClientError(msg=f"API request error: {str(err)}")
         return contribution_data
 
-    def __fetch_repos_contribution_data_parallel(self, repos: list[dict]) -> list[dict]:
+    def __fetch_repos_contribution_data_parallel(
+        self, repos: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         raw_contribution_data: dict = {}
         with ThreadPoolExecutor(
             max_workers=min(self.__MAX_WORKERS, max(1, len(repos)))
@@ -437,9 +433,13 @@ class GitHubApiClient:
             for i_complete in as_completed(fs=raw_contribution_data):
                 i = raw_contribution_data[i_complete]
                 try:
+                    contributor_data = i_complete.result()
+                    repos[i][
+                        enums.RepoPinsResDictKeys.CONTRIBUTORS.value
+                    ] = contributor_data
                     repos[i][
                         enums.RepoPinsResDictKeys.CONTRIBUTION.value
-                    ] = i_complete.result()
+                    ] = contributor_data
                 except (
                     GitHubGraphQlClientError,
                     Timeout,
@@ -447,11 +447,12 @@ class GitHubApiClient:
                     HTTPError,
                     RequestException,
                 ):
+                    repos[i][enums.RepoPinsResDictKeys.CONTRIBUTORS.value] = []
                     repos[i][enums.RepoPinsResDictKeys.CONTRIBUTION.value] = []
         return repos
 
     @property
-    def user_id(self) -> int | None:
+    def user_id(self) -> int:
         return self.__gh_config_data.user_id
 
     @property
@@ -471,8 +472,8 @@ class GitHubApiClient:
         return self.__fetch_cost_ttl
 
     def fetch_pinned_repo_data(
-        self, num_repos: int = None
-    ) -> list[dict[str, str | int | dict | list]]:
+        self, num_repos: int | None = None
+    ) -> list[dict[str, Any]]:
         pinned_repos: dict = self.__process_repo_req(
             body_json={
                 "query": self.__GRAPH_QL_REPO_PIN_QUERY_STR,
@@ -490,7 +491,7 @@ class GitHubApiClient:
         order_field: enums.RepositoryOrderFieldEnum | None = None,
         pinned_repo_urls: list[str] | None = None,
         is_contributed: bool = False,
-    ) -> list[dict[str, str | int | dict]]:
+    ) -> list[dict[str, Any]]:
         return self.__paginate_fetch_repo_data(
             body_json={
                 "query": (
@@ -516,9 +517,9 @@ class GitHubApiClient:
 
     def fetch_single_repo_data(
         self,
-        repo_owner: str = None,
-        repo_name: str = None,
-    ) -> dict[str, str | int | dict | list]:
+        repo_owner: str | None = None,
+        repo_name: str | None = None,
+    ) -> dict[str, Any]:
         return self.__process_repo_req(
             body_json={
                 "query": self.__GRAPH_QL_REPO_NAME_QUERY_STR,
@@ -532,5 +533,7 @@ class GitHubApiClient:
             is_user_data=False,
         )
 
-    def fetch_contributor_stats(self, repo_list: list[dict]) -> list[dict]:
+    def fetch_contributor_stats(
+        self, repo_list: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         return self.__fetch_repos_contribution_data_parallel(repos=repo_list)

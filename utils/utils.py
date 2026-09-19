@@ -89,21 +89,18 @@ IS_NLLB: str = environ.get("IS_NLLB", "")
 
 
 def parse_bg_img(bg_img: str) -> dict | str | None:
+    parsed_bg_img: dict | str | None = bg_img
     if bg_img:
         try:
-            bg_img = loads(s=bg_img)
-        except (JSONDecodeError, TypeError):
+            parsed_bg_img = loads(s=bg_img)
+        except JSONDecodeError, TypeError:
             if len(bg_img) == 0:
-                bg_img = None
-            elif (
-                not isinstance(bg_img, str)
-                or bg_img.startswith("{")
-                or bg_img.startswith("}")
-            ):
+                parsed_bg_img = None
+            elif bg_img.startswith("{") or bg_img.startswith("}"):
                 raise AssertionError(
                     "The repo pin background img(s) url/filepath(s) must be correct dict/str format."
                 )
-    return bg_img
+    return parsed_bg_img
 
 
 def parse_args() -> tuple:
@@ -234,7 +231,7 @@ def parse_args() -> tuple:
     if args.theme:
         try:
             args.theme = loads(s=args.theme)
-        except (JSONDecodeError, TypeError):
+        except JSONDecodeError, TypeError:
             if not isinstance(args.theme, str):
                 raise AssertionError(
                     "The repository theme must be either a string (for all repository pins) "
@@ -307,9 +304,10 @@ def get_logger() -> Logger:
     return logger
 
 
-def set_git_creds(user_name: str, user_id: int) -> None:
-    if getenv("GITHUB_ENV"):
-        with open(file=getenv("GITHUB_ENV"), mode="a") as gh_env_file:
+def set_git_creds(user_name: str, user_id: int | None) -> None:
+    github_env: str | None = getenv("GITHUB_ENV")
+    if github_env:
+        with open(file=github_env, mode="a") as gh_env_file:
             gh_env_file.write(f"GH_USER_NAME={user_name}\n")
             gh_env_file.write(f"GH_USER_ID={user_id}\n")
 
@@ -329,7 +327,7 @@ def load_themes() -> dict[str, dict[str, dict[str, str]]]:
         return load(themes_file)
 
 
-def load_img(img_path: str) -> bytes | str:
+def load_img(img_path: str) -> bytes:
     with open(
         file=get_path(path_str=img_path), mode="rb"
     ) as img_file:  # fix for local repo

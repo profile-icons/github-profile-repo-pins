@@ -6,11 +6,12 @@ from gh_profile_repo_pins.repo_pins_exceptions import (
 )
 from gh_profile_repo_pins.repo_pins_data.repo_pins_api import GitHubApiClient
 from gh_profile_repo_pins.repo_pins_data.repo_pins_stats import RepoPinStats
-from gh_profile_repo_pins.utils import set_git_creds, get_logger, Logger
+from utils.utils import set_git_creds, get_logger, Logger
 from gh_profile_repo_pins.repo_pins_generate import GenerateRepoPins
 import gh_profile_repo_pins.repo_pins_enum as enums
 from random import seed, sample
 from datetime import datetime
+from typing import Any
 
 
 class ReadMeRepoPins:
@@ -50,7 +51,7 @@ class ReadMeRepoPins:
             user_name=self.__gh_api_client.user_name,
             user_id=self.__gh_api_client.user_id,
         )
-        self.__repo_pins: list[dict] = list()
+        self.__repo_pins: list[dict[str, Any]] = []
         self.__theme: str | dict | None = theme
         self.__bg_img: dict | str | None = bg_img
 
@@ -114,12 +115,10 @@ class ReadMeRepoPins:
             repo
             for repo in self.__repo_pins
             for explicit_repo in self.__repo_names_exclusive
-            if repo.get(enums.RepoPinsResDictKeys.URL.value)
-            and repo.get(enums.RepoPinsResDictKeys.URL.value)
-            .strip()
-            .rstrip("/")
-            .lower()
-            .endswith(explicit_repo.lower())
+            if isinstance(
+                repo_url := repo.get(enums.RepoPinsResDictKeys.URL.value), str
+            )
+            and repo_url.strip().rstrip("/").lower().endswith(explicit_repo.lower())
         ][: self.__max_num_pins]
 
     def __order_repos_by_preference(self) -> None:
@@ -192,11 +191,9 @@ class ReadMeRepoPins:
                             )
                         )
             else:
-                self.__repo_pins: list[dict[str, str | int | dict]] = (
-                    self.__gh_api_client.fetch_pinned_repo_data()
-                )
-                owned_repos: list[dict[str, str | int | dict]] = []
-                contributed_repos: list[dict[str, str | int | dict]] = []
+                self.__repo_pins = self.__gh_api_client.fetch_pinned_repo_data()
+                owned_repos: list[dict[str, Any]] = []
+                contributed_repos: list[dict[str, Any]] = []
                 if (
                     len(self.__repo_pins) < self.__max_num_pins
                     and not self.__is_exclude_repos_owned
@@ -238,12 +235,11 @@ class ReadMeRepoPins:
                 self.__repo_pins.extend(contributed_repos)
             self.__order_repos_by_preference()
 
+            self.__repo_pins = self.__gh_api_client.fetch_contributor_stats(
+                repo_list=self.__repo_pins
+            )
             if self.__is_contribution_stats and self.__repo_stats:
                 self.__repo_pins = self.__repo_stats.fetch_contribution_stats(
-                    repo_list=self.__repo_pins
-                )
-            else:
-                self.__repo_pins = self.__gh_api_client.fetch_contributor_stats(
                     repo_list=self.__repo_pins
                 )
 
