@@ -68,7 +68,9 @@ THEME: str = environ.get("THEME", "")
 BG_IMG: str = environ.get("BG_IMG", "")
 
 # optional, an exclusive list of repos separated by commas (owner/repo,owner/repo,...,owner/repo)
-REPO_NAMES_EXCLUSIVE: str = environ.get("REPO_NAMES_EXCLUSIVE", "")
+REPO_NAMES_EXCLUSIVE: str = (
+    environ.get("REPO_NAMES_EXCLUSIVE", "")
+)
 
 # optional configs, overrule REPO_NAMES_EXCLUSIVE if not null, otherwise overruled by REPO_NAMES_EXCLUSIVE (default)
 NUM_REPO_PINS: str = environ.get("NUM_REPO_PINS", "")

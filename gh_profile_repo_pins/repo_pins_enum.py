@@ -97,6 +97,7 @@ class RepoPinsResDictKeys(Enum):
     STARS = "stargazerCount"
     CONTRIBUTION = "contribution_data"
     CONTRIBUTORS = "contributors"
+    LOCAL_CONTRIBUTORS = "local_contributors"
     CONTRIBUTIONS = "contributions"
     AVATAR_URL = "avatar_url"
     STATS = "stats"

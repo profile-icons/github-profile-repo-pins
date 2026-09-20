@@ -7,14 +7,18 @@ from requests import (
     RequestException,
     ConnectionError,
 )
+from gh_profile_repo_pins.repo_pins_data.repo_pins_contributor_id import (
+    ContributorIdObs,
+    ContributorIdResolver,
+)
 from gh_profile_repo_pins.repo_pins_exceptions import GitHubGraphQlClientError
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import gh_profile_repo_pins.repo_pins_enum as enums
 from dataclasses import dataclass
 from threading import local, Lock
+from typing import Any, NoReturn
 from http import HTTPStatus
 from time import sleep
-from typing import Any, NoReturn
 
 
 @dataclass
@@ -143,6 +147,36 @@ class GitHubApiClient:
       }}
     }}
     """
+    __GRAPH_QL_REPO_COMMIT_AUTHORS_QUERY: str = f"""
+    query ($owner: String!, $name: String!, $after: String) {{
+      {__GRAPH_QL_RATE_LIMIT_STR}
+      repository(owner: $owner, name: $name) {{
+        defaultBranchRef {{
+          target {{
+            ... on Commit {{
+              history(first: 100, after: $after) {{
+                pageInfo {{ hasNextPage endCursor }}
+                nodes {{
+                  parents(first: 2) {{ totalCount }}
+                  authors(first: 100) {{
+                    nodes {{
+                      name
+                      email
+                      user {{
+                        login
+                        databaseId
+                        avatarUrl
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        }}
+      }}
+    }}
+    """
     __DEFAULT_TIME_OUT: int = 10
     __DEFAULT_FETCH_LIMIT: int = 100
 
@@ -204,17 +238,18 @@ class GitHubApiClient:
 
     def __update_fetch_cost(self, res_json: dict | None = None) -> None:
         with self.__fetch_cost_update_lock:
-            self.__fetch_cost_ttl += (
-                (
-                    (res_json.get(enums.RepoPinsResDictKeys.DATA.value, {}) or {}).get(
-                        enums.RepoPinsResDictKeys.RATE_LIMIT.value, {}
-                    )
-                    or {}
-                ).get(enums.RepoPinsResDictKeys.COST.value, 0)
-                or 0
-                if res_json
-                else 1
-            )
+            if res_json:
+                self.__fetch_cost_ttl += (
+                    (
+                        (
+                            res_json.get(enums.RepoPinsResDictKeys.DATA.value, {}) or {}
+                        ).get(enums.RepoPinsResDictKeys.RATE_LIMIT.value, {})
+                        or {}
+                    ).get(enums.RepoPinsResDictKeys.COST.value, 0)
+                    or 0
+                    if res_json
+                    else 1
+                )
 
     def __post_request(self, body_json: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -365,46 +400,238 @@ class GitHubApiClient:
             self.__local_thread.session = thread_session
         return self.__local_thread.session
 
-    def __fetch_repo_contribution_data(
+    def __fetch_repo_contribution_data_rest(
         self, repo_owner: str, repo_name: str
-    ) -> list | None:
+    ) -> list[dict[str, Any]]:
         query_str: str = (
             f"https://api.github.com/repos/{repo_owner}/{repo_name}/contributors"
         )
         session: Session = self.__session()
-        contribution_data: list = []
+        contribution_data: list[dict[str, Any]] = []
         page: int = 1
 
-        try:
-            while True:
-                res_data: list = []
-                for i in range(self.__DEFAULT_TIME_OUT):
-                    res: Response = session.get(
-                        url=query_str,
-                        headers=self.__api_headers,
-                        params={
-                            "per_page": self.__DEFAULT_FETCH_LIMIT,
-                            "page": page,
-                        },
-                        timeout=self.__DEFAULT_TIME_OUT,
-                    )
-                    self.__update_fetch_cost()
+        while True:
+            res_data: list[dict[str, Any]] = []
+            for i in range(self.__DEFAULT_TIME_OUT):
+                res: Response = session.get(
+                    url=query_str,
+                    headers=self.__api_headers,
+                    params={
+                        "anon": 1,
+                        "per_page": self.__DEFAULT_FETCH_LIMIT,
+                        "page": page,
+                    },
+                    timeout=self.__DEFAULT_TIME_OUT,
+                )
+                self.__update_fetch_cost()
 
-                    if res.status_code == HTTPStatus.OK:
-                        res_data.extend(res.json() or [])
-                        break
-                    if res.status_code == HTTPStatus.ACCEPTED:
-                        sleep(min(2**i, 30))
-                        continue
-                    res.raise_for_status()
-
-                if not res_data:
+                if res.status_code == HTTPStatus.OK:
+                    res_data.extend(res.json() or [])
                     break
-                contribution_data.extend(res_data)
-                page += 1
+                if res.status_code == HTTPStatus.ACCEPTED:
+                    sleep(min(2**i, 30))
+                    continue
+                res.raise_for_status()
+
+            if not res_data:
+                break
+            contribution_data.extend(res_data)
+            page += 1
+        return contribution_data
+
+    def __fetch_repo_commit_author_data(
+        self, repo_owner: str, repo_name: str
+    ) -> list[dict[str, Any]]:
+        obs: list[dict[str, Any]] = []
+        commit_obs: list[list[int]] = []
+        after: str | None = None
+
+        while True:
+            res: dict[str, Any] = self.__post_request(
+                body_json={
+                    "query": self.__GRAPH_QL_REPO_COMMIT_AUTHORS_QUERY,
+                    "variables": {
+                        "owner": repo_owner,
+                        "name": repo_name,
+                        "after": after,
+                    },
+                }
+            )
+            history: dict[Any, Any] | Any = (
+                (
+                    (
+                        (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
+                            "repository"
+                        )
+                        or {}
+                    ).get("defaultBranchRef")
+                    or {}
+                ).get("target")
+                or {}
+            ).get("history") or {}
+
+            for commit in history.get("nodes", []) or []:
+                if not commit:
+                    continue
+                if ((commit.get("parents") or {}).get("totalCount", 0) or 0) > 1:
+                    continue
+
+                commit_idxes: list[int] = []
+                author_nodes: list[Any] | Any = (commit.get("authors") or {}).get(
+                    "nodes", []
+                ) or []
+                for actor in author_nodes:
+                    if not actor:
+                        continue
+                    user: dict[Any, Any] | Any = actor.get("user") or {}
+                    login: str = str(
+                        user.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+                    ).strip()
+                    db_id: Any | None = user.get(enums.RepoPinsResDictKeys.DB_ID.value)
+                    author_name: str = str(
+                        actor.get(enums.RepoPinsResDictKeys.NAME.value, "") or ""
+                    ).strip()
+                    email: str = str(
+                        actor.get(enums.RepoPinsResDictKeys.EMAIL.value, "") or ""
+                    ).strip()
+                    if not (login or db_id is not None or author_name or email):
+                        continue
+
+                    obs_i: dict[str, str] = {
+                        enums.RepoPinsResDictKeys.LOGIN.value: login,
+                        enums.RepoPinsResDictKeys.NAME.value: author_name,
+                        enums.RepoPinsResDictKeys.EMAIL.value: email,
+                    }
+                    if db_id is not None:
+                        obs_i["id"] = str(db_id)
+                    avatar_url: Any | None = user.get("avatarUrl")
+                    if avatar_url:
+                        obs_i[enums.RepoPinsResDictKeys.AVATAR_URL.value] = str(
+                            avatar_url
+                        )
+                    commit_idxes.append(len(obs))
+                    obs.append(obs_i)
+
+                if commit_idxes:
+                    commit_obs.append(commit_idxes)
+
+            page_info: dict[Any, Any] | Any = history.get("pageInfo") or {}
+            if not page_info.get("hasNextPage"):
+                break
+            after = page_info.get("endCursor")
+            if not after:
+                break
+
+        if not obs:
+            return []
+
+        roots: list[int] = ContributorIdResolver(
+            obs=[
+                ContributorIdObs.create(
+                    names={
+                        str(
+                            observation.get(enums.RepoPinsResDictKeys.NAME.value, "")
+                            or ""
+                        ).strip()
+                    },
+                    emails={
+                        str(
+                            observation.get(enums.RepoPinsResDictKeys.EMAIL.value, "")
+                            or ""
+                        ).strip()
+                    },
+                    login=observation.get(enums.RepoPinsResDictKeys.LOGIN.value, ""),
+                    user_id=observation.get("id"),
+                )
+                for observation in obs
+            ]
+        ).resolve()
+
+        contributors: dict[int, dict[str, Any]] = {}
+        for i, obs_i in enumerate[dict[str, Any]](obs):
+            contributor: dict[str, Any] = contributors.setdefault(
+                roots[i],
+                {
+                    enums.RepoPinsResDictKeys.LOGIN.value: "",
+                    enums.RepoPinsResDictKeys.CONTRIBUTIONS.value: 0,
+                    enums.RepoPinsResDictKeys.AUTHOR.value: set(),
+                    enums.RepoPinsResDictKeys.EMAIL.value: set(),
+                },
+            )
+            author_name = str(
+                obs_i.get(enums.RepoPinsResDictKeys.NAME.value, "") or ""
+            ).strip()
+            email = str(
+                obs_i.get(enums.RepoPinsResDictKeys.EMAIL.value, "") or ""
+            ).strip()
+            login = str(
+                obs_i.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+            ).strip()
+            if author_name:
+                contributor[enums.RepoPinsResDictKeys.AUTHOR.value].add(author_name)
+            if email:
+                contributor[enums.RepoPinsResDictKeys.EMAIL.value].add(email)
+            if login:
+                contributor[enums.RepoPinsResDictKeys.LOGIN.value] = login
+            if obs_i.get("id") is not None:
+                contributor["id"] = obs_i.get("id")
+            avatar_url = obs_i.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
+            if avatar_url:
+                contributor[enums.RepoPinsResDictKeys.AVATAR_URL.value] = avatar_url
+
+        for commit_idxes in commit_obs:
+            for root in {roots[index] for index in commit_idxes}:
+                contributor = contributors[root]
+                contributor[enums.RepoPinsResDictKeys.CONTRIBUTIONS.value] = (
+                    int(
+                        contributor.get(
+                            enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0
+                        )
+                        or 0
+                    )
+                    + 1
+                )
+
+        return sorted(
+            contributors.values(),
+            key=lambda data: (
+                int(data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0),
+                str(
+                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+                ).casefold(),
+                max(
+                    (
+                        str(value).casefold()
+                        for value in data.get(
+                            enums.RepoPinsResDictKeys.AUTHOR.value, set()
+                        )
+                    ),
+                    default="",
+                ),
+            ),
+            reverse=True,
+        )
+
+    def __fetch_repo_contribution_data(
+        self, repo_owner: str, repo_name: str
+    ) -> list[dict[str, Any]]:
+        try:
+            contribution_data: list[dict[str, Any]] = (
+                self.__fetch_repo_commit_author_data(
+                    repo_owner=repo_owner, repo_name=repo_name
+                )
+            )
+            if contribution_data:
+                return contribution_data
+        except GitHubGraphQlClientError:
+            pass
+
+        try:
+            return self.__fetch_repo_contribution_data_rest(
+                repo_owner=repo_owner, repo_name=repo_name
+            )
         except Exception as err:
             raise GitHubGraphQlClientError(msg=f"API request error: {str(err)}")
-        return contribution_data
 
     def __fetch_repos_contribution_data_parallel(
         self, repos: list[dict[str, Any]]
@@ -413,7 +640,7 @@ class GitHubApiClient:
         with ThreadPoolExecutor(
             max_workers=min(self.__MAX_WORKERS, max(1, len(repos)))
         ) as thread_pool:
-            for i, repo in enumerate(repos):
+            for i, repo in enumerate[dict[str, Any]](repos):
                 raw_contribution_data[
                     thread_pool.submit(
                         self.__fetch_repo_contribution_data,

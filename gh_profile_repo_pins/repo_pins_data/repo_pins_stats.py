@@ -1,8 +1,12 @@
+from gh_profile_repo_pins.repo_pins_data.repo_pins_contributor_id import (
+    ContributorIdObs,
+    ContributorIdResolver,
+)
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinStatsError
 from subprocess import run, PIPE, CompletedProcess, CalledProcessError
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import gh_profile_repo_pins.repo_pins_enum as enums
-from re import compile, I, Pattern
+from re import compile, I, Pattern, Match
 from tempfile import mkdtemp
 from shutil import rmtree
 from os import environ
@@ -85,24 +89,35 @@ class RepoPinStats:
         )
 
     def __fetch_repo_stats(self, owner_repo: str) -> list[dict[str, Any]]:
-        url: str = (
-            f"https://{(self.__gh_token + "@") if self.__gh_token else ""}github.com/{owner_repo}.git"
-        )
         tmp_dir: str = mkdtemp(prefix=self.__TMP_DIR)
+        commits: list[tuple[list[tuple[str, str | None]], int]] = []
 
-        repo_file_changes_add: dict[str, int] = {}
-        repo_file_changes_del: dict[str, int] = {}
-        commit_log_author_emails: dict[str, dict[str, set[Any]]] = {}
         try:
             commit_data: CompletedProcess[str] | None = self.__fetch_git_commit_data(
-                url=url, tmp_dir=tmp_dir
+                url=f"https://{f"{self.__gh_token}@" if self.__gh_token else ""}github.com/{owner_repo}.git",
+                tmp_dir=tmp_dir,
             )
             if not commit_data or not commit_data.stdout:
                 return []
 
             commit_authors_emails: list[tuple[str, str | None]] = []
+            commit_changes: int = 0
+
+            def finish_commit() -> None:
+                nonlocal commit_authors_emails, commit_changes
+                if commit_authors_emails:
+                    commits.append(
+                        (
+                            list[tuple[str, str | None]](commit_authors_emails),
+                            commit_changes,
+                        )
+                    )
+                commit_authors_emails = []
+                commit_changes = 0
+
             for commit_line in commit_data.stdout.splitlines():
                 if self.__AUTHOR_REG.fullmatch(string=commit_line):
+                    finish_commit()
                     commit_authors_emails = [
                         self.__format_author_email_str(
                             author_str=commit_line.split(self.__AUTHOR_LABEL)[
@@ -111,7 +126,10 @@ class RepoPinStats:
                         )
                     ]
                     continue
-                co_author = self.__CO_AUTHOR_REG.search(string=commit_line)
+
+                co_author: Match[str] | None = self.__CO_AUTHOR_REG.search(
+                    string=commit_line
+                )
                 if co_author:
                     commit_authors_emails.append(
                         self.__format_author_email_str(
@@ -128,47 +146,9 @@ class RepoPinStats:
                 ):
                     add_str, del_str, _ = commit_line.split(sep="\t")
                     if add_str.isdigit() and del_str.isdigit():
-                        is_email_match: bool = False
-                        for commit_author, commit_email in commit_authors_emails:
-                            commit_author_key: str = commit_author
-                            for (
-                                commit_log_author,
-                                commit_log_id,
-                            ) in commit_log_author_emails.items():
-                                for commit_log_email in commit_log_id.get(
-                                    enums.RepoPinsResDictKeys.EMAIL.value, set()
-                                ):
-                                    if commit_log_email == commit_email:
-                                        commit_author_key = commit_log_author
-                                        is_email_match = True
-                                        break
-                                if is_email_match:
-                                    break
+                        commit_changes += int(add_str) + int(del_str)
 
-                            repo_file_changes_add[commit_author_key] = (
-                                repo_file_changes_add.get(commit_author_key, 0)
-                                + int(add_str) // len(commit_authors_emails)
-                            )
-                            repo_file_changes_del[commit_author_key] = (
-                                repo_file_changes_del.get(commit_author_key, 0)
-                                + int(del_str) // len(commit_authors_emails)
-                            )
-
-                            commit_log_author_emails[commit_author_key] = (
-                                commit_log_author_emails.get(
-                                    commit_author_key,
-                                    {
-                                        enums.RepoPinsResDictKeys.AUTHOR.value: set(),
-                                        enums.RepoPinsResDictKeys.EMAIL.value: set(),
-                                    },
-                                )
-                            )
-                            commit_log_author_emails[commit_author_key][
-                                enums.RepoPinsResDictKeys.AUTHOR.value
-                            ].add(commit_author)
-                            commit_log_author_emails[commit_author_key][
-                                enums.RepoPinsResDictKeys.EMAIL.value
-                            ].add(commit_email)
+            finish_commit()
 
         except CalledProcessError as err:
             raise RepoPinStatsError(
@@ -177,30 +157,85 @@ class RepoPinStats:
         finally:
             rmtree(path=tmp_dir, ignore_errors=True)
 
-        commit_authors: set[str] = set(repo_file_changes_add.keys())
+        if not commits:
+            return []
+
+        id_idx: dict[tuple[str, str | None], int] = {}
+        obs: list[ContributorIdObs] = []
+
+        def id_node(author: str, email: str | None) -> int:
+            key: tuple[str, str | None] = (author, email)
+            existing_id = id_idx.get(key)
+            if existing_id is not None:
+                return existing_id
+
+            obs_idx: int = len(obs)
+            id_idx[key] = obs_idx
+            obs.append(
+                ContributorIdObs.create(
+                    names={author},
+                    emails={email} if email else None,
+                )
+            )
+            return obs_idx
+
+        commit_nodes: list[tuple[list[int], int]] = [
+            (
+                [
+                    id_node(author=author, email=email)
+                    for author, email in commit_authors
+                ],
+                commit_changes,
+            )
+            for commit_authors, commit_changes in commits
+        ]
+
+        resolver: ContributorIdResolver = ContributorIdResolver(obs=obs)
+        roots: list[int] = resolver.resolve()
+
+        contributor_authors: dict[int, set[str]] = {}
+        contributor_emails: dict[int, set[str]] = {}
+        for (author, email), idx in id_idx.items():
+            contributor_authors.setdefault(roots[idx], set()).add(author)
+            contributor_emails.setdefault(roots[idx], set())
+            if email:
+                contributor_emails[roots[idx]].add(email)
+
+        contributor_stats: dict[int, float | int] = {
+            root: 0.0 for root in contributor_authors
+        }
+        for nodes, commit_changes in commit_nodes:
+            contributor_roots: set[int] = {roots[node] for node in nodes}
+            if not contributor_roots:
+                continue
+            contribution_share: float | int = commit_changes / len(contributor_roots)
+            for root in contributor_roots:
+                contributor_stats[root] += contribution_share
+
         return [
             {
-                enums.RepoPinsResDictKeys.LOGIN.value: commit_author,
-                enums.RepoPinsResDictKeys.STATS.value: (
-                    repo_file_changes_add.get(commit_author, 0)
-                    + repo_file_changes_del.get(commit_author, 0)
+                enums.RepoPinsResDictKeys.LOGIN.value: max(
+                    contributor_authors[root],
+                    key=lambda value: (len(value), value),
                 ),
-                enums.RepoPinsResDictKeys.AUTHOR.value: (
-                    commit_log_author_emails[commit_author][
-                        enums.RepoPinsResDictKeys.AUTHOR.value
-                    ]
-                ),
-                enums.RepoPinsResDictKeys.EMAIL.value: (
-                    commit_log_author_emails[commit_author][
-                        enums.RepoPinsResDictKeys.EMAIL.value
-                    ]
-                ),
+                enums.RepoPinsResDictKeys.STATS.value: contributor_stats[root],
+                enums.RepoPinsResDictKeys.AUTHOR.value: contributor_authors[root],
+                enums.RepoPinsResDictKeys.EMAIL.value: contributor_emails[root],
             }
-            for commit_author in commit_authors
+            for root in sorted(
+                contributor_authors,
+                key=lambda root_i: (
+                    -contributor_stats[root],
+                    max(contributor_authors[root]).casefold(),
+                ),
+            )
         ]
 
     def fetch_contribution_stats(
-        self, repo_list: list[dict[str, Any]]
+        self,
+        repo_list: list[dict[str, Any]],
+        include_percentage_stats: bool = True,
+        raise_errors: bool = True,
     ) -> list[dict[str, Any]]:
         tasks: list[tuple[str, dict]] = []
         for repo in repo_list:
@@ -219,7 +254,18 @@ class RepoPinStats:
                 for owner_repo, repo in tasks
             }
             for k_complete in as_completed(contribution_data):
-                contribution_data[k_complete][
-                    enums.RepoPinsResDictKeys.CONTRIBUTION.value
-                ] = k_complete.result()
+                repo = contribution_data[k_complete]
+                try:
+                    local_contributors = k_complete.result()
+                except RepoPinStatsError:
+                    if raise_errors:
+                        raise
+                    local_contributors = []
+                repo[enums.RepoPinsResDictKeys.LOCAL_CONTRIBUTORS.value] = (
+                    local_contributors
+                )
+                if include_percentage_stats:
+                    repo[enums.RepoPinsResDictKeys.CONTRIBUTION.value] = (
+                        local_contributors
+                    )
         return repo_list

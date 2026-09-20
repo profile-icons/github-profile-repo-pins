@@ -1,3 +1,7 @@
+from gh_profile_repo_pins.repo_pins_data.repo_pins_contributors import (
+    ResolvedContributor,
+    resolve_repo_contributors,
+)
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_media import RepoPinImgMedia
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
 import gh_profile_repo_pins.repo_pins_enum as enums
@@ -9,7 +13,9 @@ from typing import Any
 @dataclass(frozen=True)
 class RepoPinContributor:
     login: str
-    img: RepoPinImgMedia
+    img: RepoPinImgMedia | None
+    is_user: bool = False
+    is_unknown: bool = False
 
 
 @dataclass(frozen=True)
@@ -40,7 +46,7 @@ class RepoPinImgData:
     @classmethod
     def repo_pages_url(cls, url: str) -> str:
         if url:
-            url_parsed: list[str] = urlparse(url=url).path.strip("/").split("/")
+            url_parsed: list[str | Any] = urlparse(url=url).path.strip("/").split("/")
             if len(url_parsed) == 2:
                 owner, repo = url_parsed
                 url = f"{owner.lower()}.github.io"
@@ -98,126 +104,62 @@ class RepoPinImgData:
         except ValueError as err:
             raise RepoPinImageMediaError(msg=f"Background image error: {str(err)}")
 
-        contribution_data_list: list[dict] = (
-            repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTION.value, []) or []
+        contributor_resolution = resolve_repo_contributors(
+            repo_data=repo_data,
+            login_username=login_username,
+            login_user_name=login_user_name,
+            login_user_id=login_user_id,
         )
-        contributions: dict[str, int] = {
-            str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "").strip(): (
-                data.get(enums.RepoPinsResDictKeys.STATS.value, 0) or 0
-            )
-            for data in contribution_data_list
-            if str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "").strip()
-        }
+        contributor_count = contributor_resolution.count
+        contribution_perc = contributor_resolution.contribution_perc
+        user_top_contributor_idx = contributor_resolution.user_idx
 
-        github_contributors: list[dict] = (
-            repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTORS.value, []) or []
-        )
-        if not github_contributors:
-            github_contributors = [
-                data
-                for data in contribution_data_list
-                if data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
-            ]
-
-        github_contributors = sorted(
-            [
-                data
-                for data in github_contributors
-                if str(
-                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
-                ).strip()
-            ],
-            key=lambda data: int(
-                data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0
-            ),
-            reverse=True,
-        )
-        avatar_contributor_data = [
-            data
-            for data in github_contributors
-            if data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
-        ]
-        top_contributor_data = avatar_contributor_data[:3]
-        top_contributors: tuple[RepoPinContributor, ...] = tuple(
-            RepoPinContributor(
-                login=str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "")).strip(),
-                img=RepoPinImgMedia(
-                    img=str(data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)),
-                    opacity=1.0,
-                ),
-            )
-            for data in top_contributor_data
-        )
-        login_username_norm = (login_username or "").strip().casefold()
-        user_top_contributor_idx: int | None = next(
-            (
-                i
-                for i, data in enumerate(avatar_contributor_data)
-                if str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "")
-                .strip()
-                .casefold()
-                == login_username_norm
-            ),
-            None,
+        user_img_media = RepoPinImgMedia(
+            img=f"https://avatars.githubusercontent.com/u/{login_user_id}?v=4",
+            opacity=1.0,
         )
 
-        login_user_name_norm = (login_user_name or "").strip().casefold()
-        contribution_perc: float = 0
-        total_contributions = sum(contributions.values())
-        for contribution_data in contribution_data_list:
-            authors = {
-                str(author).strip().casefold()
-                for author in contribution_data.get(
-                    enums.RepoPinsResDictKeys.AUTHOR.value, []
-                )
-            }
-            emails = {
-                str(email).strip().casefold()
-                for email in contribution_data.get(
-                    enums.RepoPinsResDictKeys.EMAIL.value, []
-                )
-                if email
-            }
-            account_noreply_email = (
-                f"{login_user_id}+{login_username_norm}@users.noreply.github.com"
-                if login_user_id is not None
-                else ""
-            )
-            is_user = (
-                (bool(login_user_name_norm) and login_user_name_norm in authors)
-                or (bool(login_username_norm) and login_username_norm in authors)
-                or (bool(account_noreply_email) and account_noreply_email in emails)
-                or (
-                    login_user_id is not None
-                    and any(
-                        email.startswith(f"{login_user_id}+")
-                        and email.endswith("@users.noreply.github.com")
-                        for email in emails
+        def contributor_img(
+            contributor: ResolvedContributor,
+        ) -> RepoPinImgMedia | None:
+            if contributor.avatar_url:
+                return RepoPinImgMedia(img=contributor.avatar_url, opacity=1.0)
+            if contributor.is_user and login_user_id is not None:
+                return user_img_media
+            return None
+
+        top_entities = list(contributor_resolution.contributors[:4])
+        known_top_avatar_count = sum(
+            contributor_img(contributor) is not None for contributor in top_entities
+        )
+        include_unknown_placeholder = (
+            known_top_avatar_count in (1, 2, 3)
+            and contributor_count > known_top_avatar_count
+        )
+        top_contributor_list: list[RepoPinContributor] = []
+        is_unknown_contributor = False
+        for contributor in top_entities:
+            img = contributor_img(contributor)
+            if img is None:
+                if not include_unknown_placeholder or is_unknown_contributor:
+                    continue
+                is_unknown_contributor = True
+                top_contributor_list.append(
+                    RepoPinContributor(
+                        login=contributor.login,
+                        img=None,
+                        is_unknown=True,
                     )
                 )
+                continue
+            top_contributor_list.append(
+                RepoPinContributor(
+                    login=contributor.login,
+                    img=img,
+                    is_user=contributor.is_user,
+                )
             )
-            if is_user:
-                contributor_key = str(
-                    contribution_data.get(enums.RepoPinsResDictKeys.LOGIN.value, "")
-                    or ""
-                ).strip()
-                user_contributions: float = contributions.get(contributor_key, 0)
-                if total_contributions:
-                    contribution_perc = user_contributions / total_contributions * 100
-                break
-
-        github_contributor_count = len(
-            {
-                str(data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "")
-                .strip()
-                .casefold()
-                for data in github_contributors
-                if str(
-                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
-                ).strip()
-            }
-        )
-        contributor_count = github_contributor_count or len(contributions)
+        top_contributors = tuple[RepoPinContributor](top_contributor_list)
 
         return RepoPinImgData(
             repo_name=(
@@ -297,10 +239,7 @@ class RepoPinImgData:
                 )
             ),
             bg_img=bg_img_media,
-            user_img=RepoPinImgMedia(
-                img=f"https://avatars.githubusercontent.com/u/{login_user_id}?v=4",
-                opacity=1.0,
-            ),
+            user_img=user_img_media,
         )
 
     def __repr__(self) -> str:

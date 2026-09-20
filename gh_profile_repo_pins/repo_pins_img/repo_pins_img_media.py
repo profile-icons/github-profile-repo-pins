@@ -1,9 +1,9 @@
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
 import gh_profile_repo_pins.repo_pins_enum as enums
-from PIL import Image as im, ImageOps as im_ops
 from requests import get, Response, HTTPError
 from urllib.parse import urlparse
 from utils.utils import load_img
+from PIL import Image, ImageOps
 from base64 import b64encode
 from io import BytesIO
 
@@ -12,7 +12,7 @@ class RepoPinImgMedia:
 
     __DEFAULT_ALIGN: str = "xMidYMid"
     __DEFAULT_MODE: str = "stretch"
-    __DEFAULT_OPACITY: float = 0.25
+    __DEFAULT_OPACITY: float | int = 0.25
 
     __BASE_64_ENCODING: str = "ascii"
     __RES_MIME_HEADER: str = "Content-Type"
@@ -25,7 +25,7 @@ class RepoPinImgMedia:
         img: str | None = None,
         align: str = __DEFAULT_ALIGN,
         mode: str = __DEFAULT_MODE,
-        opacity: float = __DEFAULT_OPACITY,
+        opacity: float | int = __DEFAULT_OPACITY,
     ) -> None:
         assert img
         self.__img = img
@@ -61,7 +61,7 @@ class RepoPinImgMedia:
     def __is_img_url(self) -> bool:
         return bool(urlparse(url=self.__img).scheme)
 
-    def __decode_img(self, byte_img: bytes) -> im.Image:
+    def __decode_img(self, byte_img: bytes) -> Image.Image:
         if self.__img_mime == enums.RepoPinsImgMediaImgMime.SVG:
             try:
                 from cairosvg import svg2png
@@ -77,12 +77,12 @@ class RepoPinImgMedia:
             )
             raw_conversion.seek(0)
 
-            return im.open(fp=raw_conversion)
+            return Image.open(fp=raw_conversion)
 
-        return im.open(fp=BytesIO(initial_bytes=byte_img))
+        return Image.open(fp=BytesIO(initial_bytes=byte_img))
 
     def __format_encoded_img(self, byte_img: bytes) -> bytes:
-        img_encoder: im.Image = im_ops.exif_transpose(
+        img_encoder: Image.Image = ImageOps.exif_transpose(
             image=self.__decode_img(byte_img=byte_img)
         )
         img_encoder.thumbnail(size=(self.__IMG_DIMS, self.__IMG_DIMS))

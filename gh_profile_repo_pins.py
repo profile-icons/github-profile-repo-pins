@@ -1,5 +1,5 @@
-from utils.utils import parse_args, get_logger, Logger
 from gh_profile_repo_pins.repo_pins import ReadMeRepoPins
+from utils.utils import parse_args, get_logger, Logger
 
 
 def gh_readme_repo_pins():

@@ -15,6 +15,7 @@ def main() -> None:
             "-m",
             "black",
             "--fast",
+            "gh_profile_repo_pins.py",
             "gh_profile_repo_pins/.",
             "utils/.",
         ]
@@ -27,6 +28,7 @@ def main() -> None:
             "-m",
             "ruff",
             "check",
+            "gh_profile_repo_pins.py",
             "gh_profile_repo_pins/.",
             "utils/.",
         ]

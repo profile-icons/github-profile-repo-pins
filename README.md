@@ -412,7 +412,7 @@ python -m gh_profile_repo_pins.repo_pins_img.repo_pins_img_svg [OPTIONS]
 ### Run
 
 ```bash
-python gh_profile_repo_pins.py
+python gh_profile_repo_pins.py [OPTIONS]
 ```
 
 ## Contribute

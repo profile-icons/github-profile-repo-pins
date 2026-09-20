@@ -103,10 +103,7 @@ class ReadMeRepoPins:
         )
 
         self.__is_contribution_stats: bool = is_contribution_stats
-        self.__repo_stats: RepoPinStats | None = (
-            RepoPinStats(gh_token=api_token) if self.__is_contribution_stats else None
-        )
-
+        self.__repo_stats: RepoPinStats = RepoPinStats(gh_token=api_token)
         self.__is_translate: bool = is_translate
         self.__is_nllb_trans: bool = is_nllb_trans
 
@@ -238,10 +235,11 @@ class ReadMeRepoPins:
             self.__repo_pins = self.__gh_api_client.fetch_contributor_stats(
                 repo_list=self.__repo_pins
             )
-            if self.__is_contribution_stats and self.__repo_stats:
-                self.__repo_pins = self.__repo_stats.fetch_contribution_stats(
-                    repo_list=self.__repo_pins
-                )
+            self.__repo_pins = self.__repo_stats.fetch_contribution_stats(
+                repo_list=self.__repo_pins,
+                include_percentage_stats=self.__is_contribution_stats,
+                raise_errors=self.__is_contribution_stats,
+            )
 
             self.__log.info(
                 msg=f"Total API fetch cost: {self.__gh_api_client.fetch_cost}"
