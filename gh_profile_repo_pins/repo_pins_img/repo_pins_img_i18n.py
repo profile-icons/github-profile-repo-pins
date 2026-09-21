@@ -1220,56 +1220,52 @@ class RepoPinImgTranslator:
         self.__language_detector: LanguageDetector = (
             LanguageDetectorBuilder.from_all_spoken_languages().build()
         )
-
         self.__fast_tokenizer: PreTrainedTokenizerBase | None = None
         self.__fast_model: ORTModelForSeq2SeqLM | None = None
         self.__fallback_tokenizer: PreTrainedTokenizerBase | None = None
         self.__fallback_model: ORTModelForSeq2SeqLM | None = None
+        self.__ensure_model(is_fallback=False)
 
-        self.__init_fast_model()
-
-    def __init_fast_model(self) -> None:
-        if self.__fast_tokenizer is not None and self.__fast_model is not None:
-            return
-
-        self.__log.info(msg=f"Loading ONNX small model: {self.__MODEL_SMALL}...")
-        self.__fast_tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path=self.__MODEL_SMALL
+    def __ensure_model(
+        self, is_fallback: bool
+    ) -> tuple[PreTrainedTokenizerBase, ORTModelForSeq2SeqLM]:
+        tokenizer: PreTrainedTokenizerBase | None = (
+            self.__fallback_tokenizer if is_fallback else self.__fast_tokenizer
         )
-        self.__fast_model = ORTModelForSeq2SeqLM.from_pretrained(
-            self.__MODEL_SMALL,
-            encoder_file_name="encoder_model.onnx",
-            decoder_file_name="decoder_model.onnx",
-            decoder_with_past_file_name="decoder_with_past_model.onnx",
-            use_cache=True,
-            use_merged=False,
+        model: ORTModelForSeq2SeqLM | None = (
+            self.__fallback_model if is_fallback else self.__fast_model
         )
-        self.__fast_model.generation_config.num_beams = 1
-        self.__fast_model.generation_config.do_sample = False
-        self.__fast_model.generation_config.early_stopping = False
+        if tokenizer is not None and model is not None:
+            return tokenizer, model
 
-    def __init_fallback_model(self) -> None:
-        if self.__fallback_tokenizer is not None and self.__fallback_model is not None:
-            return
-
+        model_name: str = self.__MODEL_LARGE if is_fallback else self.__MODEL_SMALL
+        subfolder: str | None = self.__MODEL_LARGE_DIR if is_fallback else None
         self.__log.info(
-            msg=f"Loading ONNX large model: {self.__MODEL_LARGE}/{self.__MODEL_LARGE_DIR}..."
+            msg=f"Loading ONNX {'large' if is_fallback else 'small'} model: {f"{model_name}/{subfolder}" if subfolder else model_name}..."
         )
-        self.__fallback_tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path=self.__MODEL_LARGE
+        tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path=model_name
         )
-        self.__fallback_model = ORTModelForSeq2SeqLM.from_pretrained(
-            self.__MODEL_LARGE,
-            subfolder=self.__MODEL_LARGE_DIR,
+        model = ORTModelForSeq2SeqLM.from_pretrained(
+            model_name,
+            **({"subfolder": subfolder} if subfolder else {}),
             encoder_file_name="encoder_model.onnx",
             decoder_file_name="decoder_model.onnx",
             decoder_with_past_file_name="decoder_with_past_model.onnx",
             use_cache=True,
             use_merged=False,
         )
-        self.__fallback_model.generation_config.num_beams = 1
-        self.__fallback_model.generation_config.do_sample = False
-        self.__fallback_model.generation_config.early_stopping = False
+        assert tokenizer is not None and model is not None
+
+        model.generation_config.num_beams = 1
+        model.generation_config.do_sample = False
+        model.generation_config.early_stopping = False
+
+        if is_fallback:
+            self.__fallback_tokenizer, self.__fallback_model = tokenizer, model
+        else:
+            self.__fast_tokenizer, self.__fast_model = tokenizer, model
+        return tokenizer, model
 
     def __detect_language(self, input_txt: str, translations: dict[str, str]) -> str:
         try:
@@ -1278,47 +1274,46 @@ class RepoPinImgTranslator:
             )
             if language is None:
                 raise ValueError("Unable to detect language")
-
             iso_code: IsoCode639_1 = language.iso_code_639_1
             if iso_code is None:
                 raise ValueError(f"No ISO 639-1 code for detected language: {language}")
-
-            input_txt_lang = iso_code.name.lower()
+            input_txt_lang: str = iso_code.name.lower()
             translations[input_txt_lang] = input_txt
             return input_txt_lang
-
         except Exception as err:
             self.__log.error(msg=f"Language detect: {input_txt}: {str(err)}")
             translations["en"] = input_txt
             return "en"
 
-    def __translate_m2m(
+    def __translate(
         self,
         input_txt: str,
-        source_locale: str,
+        src_locale: str,
         target_locale: str,
+        is_fallback: bool,
     ) -> str | None:
-        m2m_src: str | None = self.__M2M_CODES.get(source_locale)
-        m2m_target: str | None = self.__M2M_CODES.get(target_locale)
-        if m2m_src is None or m2m_target is None or m2m_src == m2m_target:
+        codes: dict[str, str] = self.__NLLB_CODES if is_fallback else self.__M2M_CODES
+        src_code, target_code = codes.get(src_locale), codes.get(target_locale)
+        if src_code is None or target_code is None or src_code == target_code:
             return None
 
-        self.__init_fast_model()
-        assert self.__fast_tokenizer is not None
-        assert self.__fast_model is not None
+        tokenizer, model = self.__ensure_model(is_fallback=is_fallback)
+        tokenizer.src_lang = src_code
+        if is_fallback:
+            target_token_id: int = tokenizer.convert_tokens_to_ids(tokens=target_code)
+            if target_token_id == tokenizer.unk_token_id:
+                return None
 
-        self.__fast_tokenizer.src_lang = m2m_src
-        encoded: BatchEncoding = self.__fast_tokenizer(
+        encoded: BatchEncoding = tokenizer(
             input_txt,
             return_tensors="pt",
             truncation=True,
             max_length=self.__MAX_INPUT_TOKENS,
         )
+        if not is_fallback:
+            target_token_id = getattr(tokenizer, "get_lang_id")(target_code)
 
-        get_lang_id = getattr(self.__fast_tokenizer, "get_lang_id")
-        target_token_id = get_lang_id(m2m_target)
-
-        generated = self.__fast_model.generate(
+        generated = model.generate(
             **encoded,
             forced_bos_token_id=target_token_id,
             num_beams=1,
@@ -1327,54 +1322,30 @@ class RepoPinImgTranslator:
             use_cache=True,
         )
         return (
-            self.__fast_tokenizer.batch_decode(
-                sequences=generated, skip_special_tokens=True
-            )[0].strip()
+            tokenizer.batch_decode(sequences=generated, skip_special_tokens=True)[
+                0
+            ].strip()
             or None
+        )
+
+    def __translate_m2m(
+        self, input_txt: str, src_locale: str, target_locale: str
+    ) -> str | None:
+        return self.__translate(
+            input_txt=input_txt,
+            src_locale=src_locale,
+            target_locale=target_locale,
+            is_fallback=False,
         )
 
     def __translate_nllb(
-        self,
-        input_txt: str,
-        source_locale: str,
-        target_locale: str,
+        self, input_txt: str, src_locale: str, target_locale: str
     ) -> str | None:
-        nllb_src: str | None = self.__NLLB_CODES.get(source_locale)
-        nllb_target: str | None = self.__NLLB_CODES.get(target_locale)
-        if nllb_src is None or nllb_target is None or nllb_src == nllb_target:
-            return None
-
-        self.__init_fallback_model()
-        assert self.__fallback_tokenizer is not None
-        assert self.__fallback_model is not None
-
-        self.__fallback_tokenizer.src_lang = nllb_src
-        target_token_id: int | list[int] = (
-            self.__fallback_tokenizer.convert_tokens_to_ids(tokens=nllb_target)
-        )
-        if target_token_id == self.__fallback_tokenizer.unk_token_id:
-            return None
-
-        encoded: BatchEncoding = self.__fallback_tokenizer(
-            input_txt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=self.__MAX_INPUT_TOKENS,
-        )
-
-        generated = self.__fallback_model.generate(
-            **encoded,
-            forced_bos_token_id=target_token_id,
-            num_beams=1,
-            do_sample=False,
-            max_new_tokens=self.__MAX_NEW_TOKENS,
-            use_cache=True,
-        )
-        return (
-            self.__fallback_tokenizer.batch_decode(
-                sequences=generated, skip_special_tokens=True
-            )[0].strip()
-            or None
+        return self.__translate(
+            input_txt=input_txt,
+            src_locale=src_locale,
+            target_locale=target_locale,
+            is_fallback=True,
         )
 
     def translate_all(
@@ -1386,88 +1357,73 @@ class RepoPinImgTranslator:
         if translations:
             return translations
 
-        input_txt_lang: str = self.__detect_language(input_txt, translations)
-        nllb_src: str | None = self.__NLLB_CODES.get(input_txt_lang)
-        if nllb_src is None:
+        src_locale: str = self.__detect_language(
+            input_txt=input_txt, translations=translations
+        )
+        if self.__NLLB_CODES.get(src_locale) is None:
             self.__log.warning(
-                msg=f"NLLB source language unsupported: {input_txt_lang}: {input_txt}"
+                msg=f"NLLB source language unsupported: {src_locale}: {input_txt}"
             )
             return translations
 
-        m2m_supported_locales: list[str] = [
+        m2m_locales: list[str] = [
             locale
             for locale in self.__SUPPORTED_DYNAMIC_LOCALES
-            if locale != input_txt_lang
-            and input_txt_lang in self.__M2M_CODES
+            if locale != src_locale
+            and src_locale in self.__M2M_CODES
             and locale in self.__M2M_CODES
         ]
-        nllb_supported_locales: list[str] = [
+        m2m_locale_set: set[str] = set(m2m_locales)
+        nllb_locales: list[str] = [
             locale
             for locale in self.__SUPPORTED_DYNAMIC_LOCALES
-            if locale != input_txt_lang and locale not in m2m_supported_locales
+            if locale != src_locale and locale not in m2m_locale_set
         ]
+        targets: list[tuple[str, bool]] = [(locale, True) for locale in m2m_locales]
+        if is_nllb_trans:
+            targets.extend((locale, False) for locale in nllb_locales)
 
-        num_locales: int = len(m2m_supported_locales) + (
-            len(nllb_supported_locales) if is_nllb_trans else 0
-        )
+        num_locales: int = len(targets)
         num_trans: int = 0
-
-        for target_locale in m2m_supported_locales:
+        for target_locale, use_m2m in targets:
             if num_trans != 0 and num_trans % 10 == 0:
                 self.__log.info(
                     msg=f"Repo pin translations progress: {(num_trans / num_locales * 100):.2f}% ({num_trans}/{num_locales})"
                 )
 
+            translated: str | None = None
             try:
-                translated: str | None = self.__translate_m2m(
-                    input_txt=input_txt,
-                    source_locale=input_txt_lang,
-                    target_locale=target_locale,
-                )
-                if translated:
-                    translations[target_locale] = translated
-
-            except Exception as err:
-                self.__log.warning(
-                    msg=f"M2M100 failed {input_txt_lang} -> {target_locale}; trying NLLB: {str(err)}..."
-                )
-
-                if is_nllb_trans:
+                if use_m2m:
                     try:
-                        translated = self.__translate_nllb(
+                        translated = self.__translate_m2m(
                             input_txt=input_txt,
-                            source_locale=input_txt_lang,
+                            src_locale=src_locale,
                             target_locale=target_locale,
                         )
-                        if translated:
-                            translations[target_locale] = translated
-                    except Exception as fallback_err:
-                        self.__log.error(
-                            msg=f"Translate {input_txt_lang} -> {target_locale}: {str(fallback_err)}"
+                    except Exception as err:
+                        self.__log.warning(
+                            msg=f"M2M100 failed {src_locale} -> {target_locale}; trying NLLB: {str(err)}..."
                         )
-
-            num_trans += 1
-
-        if is_nllb_trans:
-            for target_locale in nllb_supported_locales:
-                if num_trans != 0 and num_trans % 10 == 0:
-                    self.__log.info(
-                        msg=f"Repo pin translations progress: {(num_trans / num_locales * 100):.2f}% ({num_trans}/{num_locales})"
-                    )
-
-                try:
+                        if is_nllb_trans:
+                            translated = self.__translate_nllb(
+                                input_txt=input_txt,
+                                src_locale=src_locale,
+                                target_locale=target_locale,
+                            )
+                else:
                     translated = self.__translate_nllb(
                         input_txt=input_txt,
-                        source_locale=input_txt_lang,
+                        src_locale=src_locale,
                         target_locale=target_locale,
                     )
-                    if translated:
-                        translations[target_locale] = translated
-                except Exception as err:
-                    self.__log.error(
-                        msg=f"Translate {input_txt_lang} -> {target_locale}: {str(err)}"
-                    )
+            except Exception as err:
+                self.__log.error(
+                    msg=f"Translate {src_locale} -> {target_locale}: {str(err)}"
+                )
 
-            num_trans += 1
+            if translated:
+                translations[target_locale] = translated
+            if use_m2m:
+                num_trans += 1
 
         return translations

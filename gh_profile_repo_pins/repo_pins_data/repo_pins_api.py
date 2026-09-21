@@ -157,6 +157,7 @@ class GitHubApiClient:
               history(first: 100, after: $after) {{
                 pageInfo {{ hasNextPage endCursor }}
                 nodes {{
+                  committedDate
                   parents(first: 2) {{ totalCount }}
                   authors(first: 100) {{
                     nodes {{
@@ -190,17 +191,13 @@ class GitHubApiClient:
         fetch_limit: int | None = None,
     ) -> None:
         self.__local_thread: local = local()
-
         self.__api_headers: dict[str, str] = {
             "Accept": "application/vnd.github+json",
             "Connection": "keep-alive",
             "User-Agent": "hf-pr-counter/1.0",
             "Authorization": f"Bearer {api_token}",
         }
-
-        self.__fetch_limit: int = (
-            fetch_limit if fetch_limit else self.__DEFAULT_FETCH_LIMIT
-        )
+        self.__fetch_limit: int = fetch_limit or self.__DEFAULT_FETCH_LIMIT
         self.__fetch_cost_ttl: int = 0
         self.__fetch_cost_update_lock: Lock = Lock()
 
@@ -216,40 +213,43 @@ class GitHubApiClient:
             == enums.RepoPinsResDictKeys.ORGANIZATION.value
         )
 
+    @staticmethod
+    def __dict_path(data: dict[str, Any], *keys: str) -> dict[str, Any]:
+        cur: Any = data
+        for key in keys:
+            cur = cur.get(key) or {}
+        return cur
+
+    @staticmethod
+    def __clean(val: Any) -> str:
+        return str(val or "").strip()
+
+    @staticmethod
     def __raise_api_fetch_err(
-        self, res: Response, exception: type[BaseException] = GitHubGraphQlClientError
+        res: Response, exception: type[BaseException] = GitHubGraphQlClientError
     ) -> NoReturn:
-        raise exception(
-            f"{((res.json().get(enums.RepoPinsResDictKeys.ERROR.value) or {})
-            .get(enums.RepoPinsResDictKeys.MESSAGE.value))
-            if res.json().get(enums.RepoPinsResDictKeys.ERROR.value)
-            else (
-                res.json().get(enums.RepoPinsResDictKeys.ERROR.value,[])[0]
-                .get(enums.RepoPinsResDictKeys.MESSAGE.value)
-                if isinstance(res.json().get(enums.RepoPinsResDictKeys.ERROR.value), list) 
-                and res.json().get(enums.RepoPinsResDictKeys.ERROR.value)
-                else (
-                    res.json().get(enums.RepoPinsResDictKeys.MESSAGE.value) 
-                    if res.json().get(enums.RepoPinsResDictKeys.MESSAGE.value) 
-                    else "Bad credentials"
-                )
-            )}"
+        payload: Any = res.json()
+        errs: Any = payload.get(enums.RepoPinsResDictKeys.ERROR.value)
+        msg: str | None = (
+            (errs or {}).get(enums.RepoPinsResDictKeys.MESSAGE.value)
+            if errs
+            else payload.get(enums.RepoPinsResDictKeys.MESSAGE.value)
+            or "Bad credentials"
         )
+        raise exception(f"{msg}")
 
     def __update_fetch_cost(self, res_json: dict | None = None) -> None:
+        if not res_json:
+            return
+        rate_limit: dict[str, Any] = self.__dict_path(
+            res_json,
+            enums.RepoPinsResDictKeys.DATA.value,
+            enums.RepoPinsResDictKeys.RATE_LIMIT.value,
+        )
         with self.__fetch_cost_update_lock:
-            if res_json:
-                self.__fetch_cost_ttl += (
-                    (
-                        (
-                            res_json.get(enums.RepoPinsResDictKeys.DATA.value, {}) or {}
-                        ).get(enums.RepoPinsResDictKeys.RATE_LIMIT.value, {})
-                        or {}
-                    ).get(enums.RepoPinsResDictKeys.COST.value, 0)
-                    or 0
-                    if res_json
-                    else 1
-                )
+            self.__fetch_cost_ttl += (
+                rate_limit.get(enums.RepoPinsResDictKeys.COST.value, 0) or 0
+            )
 
     def __post_request(self, body_json: dict[str, Any]) -> dict[str, Any]:
         try:
@@ -259,146 +259,116 @@ class GitHubApiClient:
                 json=body_json,
                 timeout=self.__DEFAULT_TIME_OUT,
             )
-            if res.status_code == HTTPStatus.OK:
-                res_json: dict[str, Any] = res.json()
-                errors = res_json.get(enums.RepoPinsResDictKeys.ERROR.value)
-                if isinstance(errors, list) and errors and isinstance(errors[0], dict):
-                    error_message = errors[0].get(
-                        enums.RepoPinsResDictKeys.MESSAGE.value
-                    )
-                    if error_message:
-                        raise Exception(error_message)
-                self.__update_fetch_cost(res_json=res_json)
-                return res_json
-            elif res.status_code == HTTPStatus.UNAUTHORIZED or not (
-                (res.json().get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                    enums.RepoPinsResDictKeys.VIEWER.value
-                )
-                or {}
-            ).get(enums.RepoPinsResDictKeys.LOGIN.value, None):
+            if res.status_code != HTTPStatus.OK:
                 self.__raise_api_fetch_err(res=res)
-            else:
-                self.__raise_api_fetch_err(res=res)
+
+            res_json: dict[str, Any] = res.json()
+            errs: Any | None = res_json.get(enums.RepoPinsResDictKeys.ERROR.value)
+            if isinstance(errs, list) and errs and isinstance(errs[0], dict):
+                err_msg: Any = errs[0].get(enums.RepoPinsResDictKeys.MESSAGE.value)
+                if err_msg:
+                    raise Exception(err_msg)
+
+            self.__update_fetch_cost(res_json=res_json)
+            return res_json
         except Exception as err:
             raise GitHubGraphQlClientError(msg=f"API request error: {err}")
 
     def __get_user_config(self, username: str) -> tuple[str, int, str]:
-        res: dict[str, Any] = self.__post_request(
-            body_json={
-                "query": self.__GRAPH_QL_USER_DATA_QUERY,
-                "variables": {enums.RepoPinsResDictKeys.LOGIN.value: username},
-            }
+        user: dict[str, Any] = self.__dict_path(
+            self.__post_request(
+                body_json={
+                    "query": self.__GRAPH_QL_USER_DATA_QUERY,
+                    "variables": {enums.RepoPinsResDictKeys.LOGIN.value: username},
+                }
+            ),
+            enums.RepoPinsResDictKeys.DATA.value,
+            enums.RepoPinsResDictKeys.USER.value,
         )
         return (
-            (
-                (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                    enums.RepoPinsResDictKeys.USER.value
-                )
-                or {}
-            ).get(enums.RepoPinsResDictKeys.NAME.value, ""),
-            (
-                (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                    enums.RepoPinsResDictKeys.USER.value
-                )
-                or {}
-            ).get(enums.RepoPinsResDictKeys.DB_ID.value, 0),
-            (
-                (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                    enums.RepoPinsResDictKeys.USER.value
-                )
-                or {}
-            ).get(enums.RepoPinsResDictKeys.CREATED_AT.value, ""),
+            user.get(enums.RepoPinsResDictKeys.NAME.value, ""),
+            user.get(enums.RepoPinsResDictKeys.DB_ID.value, 0),
+            user.get(enums.RepoPinsResDictKeys.CREATED_AT.value, ""),
         )
 
     def __verify_user(self, username: str | None = None) -> tuple[str, str, int, str]:
-        res: dict[str, Any] = self.__post_request(
-            body_json={"query": self.__GRAPH_QL_VERIFY_TOKEN_QUERY}
+        viewer: dict[str, Any] = self.__dict_path(
+            self.__post_request(
+                body_json={"query": self.__GRAPH_QL_VERIFY_TOKEN_QUERY}
+            ),
+            enums.RepoPinsResDictKeys.DATA.value,
+            enums.RepoPinsResDictKeys.VIEWER.value,
         )
-        res_username: str = (
-            (
-                (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                    enums.RepoPinsResDictKeys.VIEWER.value
-                )
-                or {}
-            )
-            .get(enums.RepoPinsResDictKeys.LOGIN.value, "")
-            .strip()
+        verified_username: str = self.__clean(
+            viewer.get(enums.RepoPinsResDictKeys.LOGIN.value)
         )
-        if not username:
-            username = res_username
+        username = username or verified_username
         return username, *self.__get_user_config(username=username)
 
     def __get_repo_owner_type(self, repo_owner: str | None) -> str:
         assert repo_owner
-        res: dict[str, Any] = self.__post_request(
-            body_json={
-                "query": self.__GRAPH_QL_REPO_OWNER_TYPE_QUERY,
-                "variables": {enums.RepoPinsResDictKeys.LOGIN.value: repo_owner},
-            }
+        owner: dict[str, Any] = self.__dict_path(
+            self.__post_request(
+                body_json={
+                    "query": self.__GRAPH_QL_REPO_OWNER_TYPE_QUERY,
+                    "variables": {enums.RepoPinsResDictKeys.LOGIN.value: repo_owner},
+                }
+            ),
+            enums.RepoPinsResDictKeys.DATA.value,
+            enums.RepoPinsResDictKeys.REPOSITORY_OWNER.value,
         )
-        res_repo_owner_type: str = (
-            (
-                (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                    enums.RepoPinsResDictKeys.REPOSITORY_OWNER.value
-                )
-                or {}
-            )
-            .get(enums.RepoPinsResDictKeys.TYPENAME.value, "")
-            .strip()
-            .lower()
-        )
-        return res_repo_owner_type
+        return self.__clean(owner.get(enums.RepoPinsResDictKeys.TYPENAME.value)).lower()
 
     def __process_repo_req(
         self, body_json: dict[str, Any], repo_data_key: str, is_user_data: bool = True
     ) -> dict[str, Any]:
-        res_data: dict[str, Any] = (
+        res_data: dict[Any, Any] | Any = (
             self.__post_request(body_json=body_json).get(
                 enums.RepoPinsResDictKeys.DATA.value
             )
             or {}
         )
-        return (
+        parent: dict[Any, Any] | Any = (
             res_data.get(enums.RepoPinsResDictKeys.USER.value) or {}
             if is_user_data
             else res_data
-        ).get(repo_data_key) or {}
+        )
+        return parent.get(repo_data_key) or {}
 
     def __paginate_fetch_repo_data(
         self, body_json: dict[str, Any], repo_data_key: str, pinned_repo_urls: list[str]
     ) -> list[dict[str, Any]]:
-        res_node_data: list[dict[str, Any]] = []
-        repo_urls: set[str] = set(pinned_repo_urls)
+        res: list[dict[str, Any]] = []
+        seen_urls: set[str] = set(pinned_repo_urls)
         after: str | None = None
 
         while True:
-            repo_data: dict = self.__process_repo_req(
-                body_json=(
-                    body_json["variables"].update({"after": after}) or body_json
-                ),
+            body_json["variables"]["after"] = after
+            repo_data: dict[str, Any] = self.__process_repo_req(
+                body_json=body_json,
                 repo_data_key=repo_data_key,
             )
             for node in repo_data.get("nodes", []):
                 if not node:
                     continue
-                url: str = node.get(enums.RepoPinsResDictKeys.URL.value, "")
-                if url in repo_urls:
+                url: Any = node.get(enums.RepoPinsResDictKeys.URL.value, "")
+                if url in seen_urls:
                     continue
-                repo_urls.add(url)
-                res_node_data.append(node)
+                seen_urls.add(url)
+                res.append(node)
 
-            if not repo_data.get("pageInfo", {}).get("hasNextPage"):
-                break
-            after = repo_data.get("pageInfo", {}).get("endCursor")
-
-        return res_node_data
+            page_info: Any = repo_data.get("pageInfo", {})
+            if not page_info.get("hasNextPage"):
+                return res
+            after = page_info.get("endCursor")
 
     def __session(self) -> Session:
-        if not hasattr(self.__local_thread, Session.__name__.lower()):
-            thread_session: Session = Session()
-            thread_session.headers.update(self.__api_headers)
-            self.__local_thread.session = thread_session
-        return self.__local_thread.session
+        session = getattr(self.__local_thread, "session", None)
+        if session is None:
+            session = Session()
+            session.headers.update(self.__api_headers)
+            self.__local_thread.session = session
+        return session
 
     def __fetch_repo_contribution_data_rest(
         self, repo_owner: str, repo_name: str
@@ -411,8 +381,8 @@ class GitHubApiClient:
         page: int = 1
 
         while True:
-            res_data: list[dict[str, Any]] = []
-            for i in range(self.__DEFAULT_TIME_OUT):
+            page_data: list[dict[str, Any]] = []
+            for attempt in range(self.__DEFAULT_TIME_OUT):
                 res: Response = session.get(
                     url=query_str,
                     headers=self.__api_headers,
@@ -426,49 +396,76 @@ class GitHubApiClient:
                 self.__update_fetch_cost()
 
                 if res.status_code == HTTPStatus.OK:
-                    res_data.extend(res.json() or [])
+                    page_data.extend(res.json() or [])
                     break
                 if res.status_code == HTTPStatus.ACCEPTED:
-                    sleep(min(2**i, 30))
+                    sleep(min(2**attempt, 30))
                     continue
                 res.raise_for_status()
 
-            if not res_data:
-                break
-            contribution_data.extend(res_data)
+            if not page_data:
+                return contribution_data
+            contribution_data.extend(page_data)
             page += 1
-        return contribution_data
 
-    def __fetch_repo_commit_author_data(
+    def __commit_history(self, res: dict[str, Any]) -> dict[str, Any]:
+        return self.__dict_path(
+            res,
+            enums.RepoPinsResDictKeys.DATA.value,
+            "repository",
+            "defaultBranchRef",
+            "target",
+            "history",
+        )
+
+    def __author_observation(
+        self, actor: dict[str, Any], commit_date: str
+    ) -> dict[str, Any] | None:
+        user: dict[Any, Any] | Any = actor.get("user") or {}
+        login: str = self.__clean(val=user.get(enums.RepoPinsResDictKeys.LOGIN.value))
+        db_id: str | None = user.get(enums.RepoPinsResDictKeys.DB_ID.value)
+        author_name: str = self.__clean(
+            val=actor.get(enums.RepoPinsResDictKeys.NAME.value)
+        )
+        email: str = self.__clean(val=actor.get(enums.RepoPinsResDictKeys.EMAIL.value))
+
+        if not (login or db_id is not None or author_name or email):
+            return None
+
+        obs: dict[str, Any] = {
+            enums.RepoPinsResDictKeys.LOGIN.value: login,
+            enums.RepoPinsResDictKeys.NAME.value: author_name,
+            enums.RepoPinsResDictKeys.EMAIL.value: email,
+            enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value: commit_date,
+        }
+        if db_id is not None:
+            obs["id"] = str(db_id)
+
+        avatar_url: str | None = user.get("avatarUrl")
+        if avatar_url:
+            obs[enums.RepoPinsResDictKeys.AVATAR_URL.value] = str(avatar_url)
+        return obs
+
+    def __collect_commit_author_observations(
         self, repo_owner: str, repo_name: str
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], list[list[int]]]:
         obs: list[dict[str, Any]] = []
         commit_obs: list[list[int]] = []
         after: str | None = None
 
         while True:
-            res: dict[str, Any] = self.__post_request(
-                body_json={
-                    "query": self.__GRAPH_QL_REPO_COMMIT_AUTHORS_QUERY,
-                    "variables": {
-                        "owner": repo_owner,
-                        "name": repo_name,
-                        "after": after,
-                    },
-                }
+            history: dict[str, Any] = self.__commit_history(
+                self.__post_request(
+                    body_json={
+                        "query": self.__GRAPH_QL_REPO_COMMIT_AUTHORS_QUERY,
+                        "variables": {
+                            "owner": repo_owner,
+                            "name": repo_name,
+                            "after": after,
+                        },
+                    }
+                )
             )
-            history: dict[Any, Any] | Any = (
-                (
-                    (
-                        (res.get(enums.RepoPinsResDictKeys.DATA.value) or {}).get(
-                            "repository"
-                        )
-                        or {}
-                    ).get("defaultBranchRef")
-                    or {}
-                ).get("target")
-                or {}
-            ).get("history") or {}
 
             for commit in history.get("nodes", []) or []:
                 if not commit:
@@ -477,40 +474,18 @@ class GitHubApiClient:
                     continue
 
                 commit_idxes: list[int] = []
-                author_nodes: list[Any] | Any = (commit.get("authors") or {}).get(
-                    "nodes", []
-                ) or []
-                for actor in author_nodes:
+                commit_date: str = str(commit.get("committedDate", "") or "")
+                for actor in (commit.get("authors") or {}).get("nodes", []) or []:
                     if not actor:
                         continue
-                    user: dict[Any, Any] | Any = actor.get("user") or {}
-                    login: str = str(
-                        user.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
-                    ).strip()
-                    db_id: Any | None = user.get(enums.RepoPinsResDictKeys.DB_ID.value)
-                    author_name: str = str(
-                        actor.get(enums.RepoPinsResDictKeys.NAME.value, "") or ""
-                    ).strip()
-                    email: str = str(
-                        actor.get(enums.RepoPinsResDictKeys.EMAIL.value, "") or ""
-                    ).strip()
-                    if not (login or db_id is not None or author_name or email):
+                    auth_obs: dict[str, Any] | None = self.__author_observation(
+                        actor=actor,
+                        commit_date=commit_date,
+                    )
+                    if auth_obs is None:
                         continue
-
-                    obs_i: dict[str, str] = {
-                        enums.RepoPinsResDictKeys.LOGIN.value: login,
-                        enums.RepoPinsResDictKeys.NAME.value: author_name,
-                        enums.RepoPinsResDictKeys.EMAIL.value: email,
-                    }
-                    if db_id is not None:
-                        obs_i["id"] = str(db_id)
-                    avatar_url: Any | None = user.get("avatarUrl")
-                    if avatar_url:
-                        obs_i[enums.RepoPinsResDictKeys.AVATAR_URL.value] = str(
-                            avatar_url
-                        )
                     commit_idxes.append(len(obs))
-                    obs.append(obs_i)
+                    obs.append(auth_obs)
 
                 if commit_idxes:
                     commit_obs.append(commit_idxes)
@@ -522,82 +497,88 @@ class GitHubApiClient:
             if not after:
                 break
 
-        if not obs:
-            return []
+        return obs, commit_obs
 
-        roots: list[int] = ContributorIdResolver(
+    def __resolve_contributors(
+        self,
+        obs: list[dict[str, Any]],
+        commit_obs: list[list[int]],
+    ) -> list[dict[str, Any]]:
+        roots = ContributorIdResolver(
             obs=[
                 ContributorIdObs.create(
-                    names={
-                        str(
-                            observation.get(enums.RepoPinsResDictKeys.NAME.value, "")
-                            or ""
-                        ).strip()
-                    },
+                    names={self.__clean(ob.get(enums.RepoPinsResDictKeys.NAME.value))},
                     emails={
-                        str(
-                            observation.get(enums.RepoPinsResDictKeys.EMAIL.value, "")
-                            or ""
-                        ).strip()
+                        self.__clean(ob.get(enums.RepoPinsResDictKeys.EMAIL.value))
                     },
-                    login=observation.get(enums.RepoPinsResDictKeys.LOGIN.value, ""),
-                    user_id=observation.get("id"),
+                    login=ob.get(enums.RepoPinsResDictKeys.LOGIN.value, ""),
+                    user_id=ob.get("id"),
                 )
-                for observation in obs
-            ]
+                for ob in obs
+            ],
+            is_mult_profile_merge=True,
         ).resolve()
 
         contributors: dict[int, dict[str, Any]] = {}
-        for i, obs_i in enumerate[dict[str, Any]](obs):
+        for idx, ob in enumerate[dict[str, Any]](obs):
             contributor: dict[str, Any] = contributors.setdefault(
-                roots[i],
+                roots[idx],
                 {
                     enums.RepoPinsResDictKeys.LOGIN.value: "",
                     enums.RepoPinsResDictKeys.CONTRIBUTIONS.value: 0,
                     enums.RepoPinsResDictKeys.AUTHOR.value: set(),
                     enums.RepoPinsResDictKeys.EMAIL.value: set(),
+                    enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value: "",
                 },
             )
-            author_name = str(
-                obs_i.get(enums.RepoPinsResDictKeys.NAME.value, "") or ""
-            ).strip()
-            email = str(
-                obs_i.get(enums.RepoPinsResDictKeys.EMAIL.value, "") or ""
-            ).strip()
-            login = str(
-                obs_i.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
-            ).strip()
+            author_name: str = self.__clean(
+                ob.get(enums.RepoPinsResDictKeys.NAME.value)
+            )
+            email: str = self.__clean(ob.get(enums.RepoPinsResDictKeys.EMAIL.value))
+            login: str = self.__clean(ob.get(enums.RepoPinsResDictKeys.LOGIN.value))
+            commit_date: str = str(
+                ob.get(enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value, "") or ""
+            )
+
             if author_name:
                 contributor[enums.RepoPinsResDictKeys.AUTHOR.value].add(author_name)
             if email:
                 contributor[enums.RepoPinsResDictKeys.EMAIL.value].add(email)
+
+            cur_latest: str = str(
+                contributor.get(enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value, "")
+                or ""
+            )
+            if not bool(
+                login
+                or ob.get("id") is not None
+                or ob.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
+            ) or (cur_latest and commit_date < cur_latest):
+                continue
+
             if login:
                 contributor[enums.RepoPinsResDictKeys.LOGIN.value] = login
-            if obs_i.get("id") is not None:
-                contributor["id"] = obs_i.get("id")
-            avatar_url = obs_i.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
+            if ob.get("id") is not None:
+                contributor["id"] = ob.get("id")
+            avatar_url: str | None = ob.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
             if avatar_url:
                 contributor[enums.RepoPinsResDictKeys.AVATAR_URL.value] = avatar_url
+            contributor[enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value] = commit_date
 
-        for commit_idxes in commit_obs:
-            for root in {roots[index] for index in commit_idxes}:
+        contribution_key: str = enums.RepoPinsResDictKeys.CONTRIBUTIONS.value
+        for commit_indexes in commit_obs:
+            for root in {roots[index] for index in commit_indexes}:
                 contributor = contributors[root]
-                contributor[enums.RepoPinsResDictKeys.CONTRIBUTIONS.value] = (
-                    int(
-                        contributor.get(
-                            enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0
-                        )
-                        or 0
-                    )
-                    + 1
+                contributor[contribution_key] = (
+                    int(contributor.get(contribution_key, 0) or 0) + 1
                 )
 
         return sorted(
             contributors.values(),
             key=lambda data: (
-                int(data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0),
-                str(
-                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+                int(data.get(contribution_key, 0) or 0),
+                self.__clean(
+                    data.get(enums.RepoPinsResDictKeys.LOGIN.value)
                 ).casefold(),
                 max(
                     (
@@ -612,13 +593,28 @@ class GitHubApiClient:
             reverse=True,
         )
 
+    def __fetch_repo_commit_author_data(
+        self, repo_owner: str, repo_name: str
+    ) -> list[dict[str, Any]]:
+        obs, commit_obs = self.__collect_commit_author_observations(
+            repo_owner=repo_owner,
+            repo_name=repo_name,
+        )
+        if not obs:
+            return []
+        return self.__resolve_contributors(
+            obs=obs,
+            commit_obs=commit_obs,
+        )
+
     def __fetch_repo_contribution_data(
         self, repo_owner: str, repo_name: str
     ) -> list[dict[str, Any]]:
         try:
             contribution_data: list[dict[str, Any]] = (
                 self.__fetch_repo_commit_author_data(
-                    repo_owner=repo_owner, repo_name=repo_name
+                    repo_owner=repo_owner,
+                    repo_name=repo_name,
                 )
             )
             if contribution_data:
@@ -628,7 +624,8 @@ class GitHubApiClient:
 
         try:
             return self.__fetch_repo_contribution_data_rest(
-                repo_owner=repo_owner, repo_name=repo_name
+                repo_owner=repo_owner,
+                repo_name=repo_name,
             )
         except Exception as err:
             raise GitHubGraphQlClientError(msg=f"API request error: {str(err)}")
@@ -636,37 +633,33 @@ class GitHubApiClient:
     def __fetch_repos_contribution_data_parallel(
         self, repos: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        raw_contribution_data: dict = {}
-        with ThreadPoolExecutor(
-            max_workers=min(self.__MAX_WORKERS, max(1, len(repos)))
-        ) as thread_pool:
-            for i, repo in enumerate[dict[str, Any]](repos):
-                raw_contribution_data[
-                    thread_pool.submit(
-                        self.__fetch_repo_contribution_data,
-                        (
-                            (
-                                repo.get(enums.RepoPinsResDictKeys.OWNER.value, {})
-                                or {}
-                            ).get(enums.RepoPinsResDictKeys.LOGIN.value, "")
-                            or ""
-                        ).strip(),
-                        (
-                            repo.get(enums.RepoPinsResDictKeys.NAME.value, "") or ""
-                        ).strip(),
-                    )
-                ] = i
+        if not repos:
+            return repos
 
-            for i_complete in as_completed(fs=raw_contribution_data):
-                i = raw_contribution_data[i_complete]
+        with ThreadPoolExecutor(
+            max_workers=min(self.__MAX_WORKERS, len(repos))
+        ) as thread_pool:
+            futures: dict[Any, Any] = {}
+            for idx, repo in enumerate[dict[str, Any]](repos):
+                owner: str = self.__clean(
+                    (repo.get(enums.RepoPinsResDictKeys.OWNER.value) or {}).get(
+                        enums.RepoPinsResDictKeys.LOGIN.value
+                    )
+                )
+                repo_name: str = self.__clean(
+                    repo.get(enums.RepoPinsResDictKeys.NAME.value)
+                )
+                future: Any = thread_pool.submit(
+                    self.__fetch_repo_contribution_data,
+                    owner,
+                    repo_name,
+                )
+                futures[future] = idx
+
+            for future in as_completed(fs=futures):
+                idx = futures[future]
                 try:
-                    contributor_data = i_complete.result()
-                    repos[i][
-                        enums.RepoPinsResDictKeys.CONTRIBUTORS.value
-                    ] = contributor_data
-                    repos[i][
-                        enums.RepoPinsResDictKeys.CONTRIBUTION.value
-                    ] = contributor_data
+                    contributor_data: Any = future.result()
                 except (
                     GitHubGraphQlClientError,
                     Timeout,
@@ -674,8 +667,15 @@ class GitHubApiClient:
                     HTTPError,
                     RequestException,
                 ):
-                    repos[i][enums.RepoPinsResDictKeys.CONTRIBUTORS.value] = []
-                    repos[i][enums.RepoPinsResDictKeys.CONTRIBUTION.value] = []
+                    contributor_data = []
+
+                repos[idx][
+                    enums.RepoPinsResDictKeys.CONTRIBUTORS.value
+                ] = contributor_data
+                repos[idx][
+                    enums.RepoPinsResDictKeys.CONTRIBUTION.value
+                ] = contributor_data
+
         return repos
 
     @property
@@ -701,7 +701,7 @@ class GitHubApiClient:
     def fetch_pinned_repo_data(
         self, num_repos: int | None = None
     ) -> list[dict[str, Any]]:
-        pinned_repos: dict = self.__process_repo_req(
+        pinned_repos: dict[str, Any] = self.__process_repo_req(
             body_json={
                 "query": self.__GRAPH_QL_REPO_PIN_QUERY_STR,
                 "variables": {
@@ -739,7 +739,7 @@ class GitHubApiClient:
             repo_data_key=(
                 "repositoriesContributedTo" if is_contributed else "repositories"
             ),
-            pinned_repo_urls=pinned_repo_urls if pinned_repo_urls else [],
+            pinned_repo_urls=pinned_repo_urls or [],
         )
 
     def fetch_single_repo_data(

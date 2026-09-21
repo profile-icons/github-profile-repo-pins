@@ -14,12 +14,15 @@ class ThemeSVG:
     user_border: str | None = None  # highlighted user avatar border
 
     def __repr__(self) -> str:
-        user_border = self.user_border or self.link
         return f""":root {{
               --canvas: {self.canvas}; --border: {self.border}; 
               --text: {self.text}; --danger: {self.danger}; --link: {self.link};
-              --user-border: {user_border};
+              --user-border: {self.user_border or self.link};
             }}"""
+
+
+ThemeMap = dict[enums.RepoPinsImgThemeMode, ThemeSVG]
+ThemeDatabase = dict[enums.RepoPinsImgThemeName, ThemeMap]
 
 
 class RepoPinImgTheme:
@@ -29,39 +32,35 @@ class RepoPinImgTheme:
         theme_name: enums.RepoPinsImgThemeName = enums.RepoPinsImgThemeName.GITHUB_SOFT,
     ) -> None:
         try:
-            svg_themes_db: dict[
-                enums.RepoPinsImgThemeName, dict[enums.RepoPinsImgThemeMode, ThemeSVG]
-            ] = {
-                enums.RepoPinsImgThemeName(k): {
-                    enums.RepoPinsImgThemeMode(t): ThemeSVG(**d) for t, d in v.items()
+            themes: ThemeDatabase = {
+                enums.RepoPinsImgThemeName(name): {
+                    enums.RepoPinsImgThemeMode(mode): ThemeSVG(**data)
+                    for mode, data in theme.items()
                 }
-                for k, v in load_themes().items()
-                if k in enums.RepoPinsImgThemeName
+                for name, theme in load_themes().items()
+                if name in enums.RepoPinsImgThemeName
             }
-            if not svg_themes_db:
+            if not themes:
                 raise RepoPinImageThemeError(msg="No SVG themes are found.")
         except TypeError:
             raise RepoPinImageThemeError(
                 msg=f"Theme '{theme_name.value}' is missing argument(s)."
             )
 
-        if theme_name not in svg_themes_db:
+        if theme_name not in themes:
             raise RepoPinImageThemeError(
                 msg=f"Theme '{theme_name.value}' is not found in the database."
             )
 
-        self.__svg_theme: dict[enums.RepoPinsImgThemeMode, ThemeSVG] = svg_themes_db[
-            theme_name
-        ]
-        if (
-            not self.__svg_theme
-            or enums.RepoPinsImgThemeMode.LIGHT not in self.__svg_theme
-            or enums.RepoPinsImgThemeMode.DARK not in self.__svg_theme
-        ):
+        self.__svg_theme = themes[theme_name]
+        if not {
+            enums.RepoPinsImgThemeMode.LIGHT,
+            enums.RepoPinsImgThemeMode.DARK,
+        }.issubset(self.__svg_theme):
             raise RepoPinImageThemeError(
                 msg=f"Theme '{theme_name.value}' is missing dark/light mode(s)."
             )
 
     @property
-    def svg_theme(self) -> dict[enums.RepoPinsImgThemeMode, ThemeSVG]:
+    def svg_theme(self) -> ThemeMap:
         return self.__svg_theme

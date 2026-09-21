@@ -57,6 +57,7 @@ Insert the following placeholder into the repository profile `README.md` where y
 
 ```markdown
 <!-- START: REPO-PINS -->
+[![uni-git-projects/seng202-agile-bdd-monopoly pin img](https://raw.githubusercontent.com//refs/heads/generated/repo_pin_imgs/0.svg)](https://uni-projects-demos.github.io/seng201-301-javafx-web-ui/) 
 <!-- END: REPO-PINS -->
 ```
 

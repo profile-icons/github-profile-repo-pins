@@ -1,6 +1,7 @@
 from gh_profile_repo_pins.repo_pins_data.repo_pins_contributors import (
-    ResolvedContributor,
+    ContributorRes,
     resolve_repo_contributors,
+    ResContributor,
 )
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_media import RepoPinImgMedia
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
@@ -45,15 +46,18 @@ class RepoPinImgData:
 
     @classmethod
     def repo_pages_url(cls, url: str) -> str:
-        if url:
-            url_parsed: list[str | Any] = urlparse(url=url).path.strip("/").split("/")
-            if len(url_parsed) == 2:
-                owner, repo = url_parsed
-                url = f"{owner.lower()}.github.io"
-                if repo.lower() not in [url, ".github"]:
-                    url += f"/{repo}"
-                url = f"https://{url}"
-        return url
+        if not url:
+            return url
+
+        parts = urlparse(url=url).path.strip("/").split(sep="/")
+        if len(parts) != 2:
+            return url
+
+        owner, repo = parts
+        url = f"{owner.lower()}.github.io"
+        if repo.lower() not in [url, ".github"]:
+            url += f"/{repo}"
+        return f"https://{url}"
 
     @classmethod
     def format_repo_pin_data(
@@ -68,83 +72,76 @@ class RepoPinImgData:
         ) = enums.RepoPinsImgThemeName.GITHUB_SOFT,
         bg_img: dict | str | None = None,
     ) -> "RepoPinImgData":
-        repo_owner = (
-            repo_data.get(enums.RepoPinsResDictKeys.URL.value, "").split("/")[-2]
-            if len(repo_data.get(enums.RepoPinsResDictKeys.URL.value, "").split("/"))
-            > 1
-            else ""
+        url_key: str = enums.RepoPinsResDictKeys.URL.value
+        repo_url: str = repo_data.get(url_key, "")
+        url_parts: list[str] = repo_url.split("/")
+        repo_owner: str = url_parts[-2] if len(url_parts) > 1 else ""
+
+        parent_data: dict[str, Any] = repo_data.get(
+            enums.RepoPinsResDictKeys.PARENT.value, {}
         )
-        repo_parent = (
-            repo_data.get(enums.RepoPinsResDictKeys.PARENT.value, {}).get(
-                enums.RepoPinsResDictKeys.OWNER_REPO.value, ""
-            )
-            or ""
-            if repo_data.get(enums.RepoPinsResDictKeys.PARENT.value, {})
+        repo_parent: str | None = (
+            parent_data.get(enums.RepoPinsResDictKeys.OWNER_REPO.value, "") or ""
+            if parent_data
             else None
         )
-        primary_language_dict = (
+        language: dict[str, str] = (
             repo_data.get(enums.RepoPinsResDictKeys.LANGUAGE.value, {}) or {}
         )
 
         try:
             bg_img_media: RepoPinImgMedia | None = (
-                (
-                    RepoPinImgMedia(**bg_img)
-                    if isinstance(bg_img, dict)
-                    else RepoPinImgMedia(img=bg_img)
+                RepoPinImgMedia(**bg_img)
+                if isinstance(bg_img, dict)
+                and bg_img
+                and bg_img.get(enums.RepoPinsResDictKeys.IMG.value)
+                else (
+                    RepoPinImgMedia(img=bg_img)
+                    if isinstance(bg_img, str) and bg_img
+                    else None
                 )
-                if bg_img
-                and (
-                    isinstance(bg_img, dict)
-                    and bg_img.get(enums.RepoPinsResDictKeys.IMG.value)
-                    or isinstance(bg_img, str)
-                )
-                else None
             )
         except ValueError as err:
             raise RepoPinImageMediaError(msg=f"Background image error: {str(err)}")
 
-        contributor_resolution = resolve_repo_contributors(
+        res: ContributorRes = resolve_repo_contributors(
             repo_data=repo_data,
             login_username=login_username,
             login_user_name=login_user_name,
             login_user_id=login_user_id,
         )
-        contributor_count = contributor_resolution.count
-        contribution_perc = contributor_resolution.contribution_perc
-        user_top_contributor_idx = contributor_resolution.user_idx
-
-        user_img_media = RepoPinImgMedia(
-            img=f"https://avatars.githubusercontent.com/u/{login_user_id}?v=4",
+        user_idx: int | None = res.user_idx
+        res_user: ResContributor | None = (
+            res.contributors[user_idx]
+            if user_idx is not None and user_idx < len(res.contributors)
+            else None
+        )
+        user_img_media: RepoPinImgMedia = RepoPinImgMedia(
+            img=(
+                res_user.avatar_url
+                if res_user is not None and res_user.avatar_url
+                else f"https://avatars.githubusercontent.com/u/{login_user_id}?v=4"
+            ),
             opacity=1.0,
         )
 
-        def contributor_img(
-            contributor: ResolvedContributor,
-        ) -> RepoPinImgMedia | None:
-            if contributor.avatar_url:
-                return RepoPinImgMedia(img=contributor.avatar_url, opacity=1.0)
-            if contributor.is_user and login_user_id is not None:
-                return user_img_media
-            return None
-
-        top_entities = list(contributor_resolution.contributors[:4])
-        known_top_avatar_count = sum(
-            contributor_img(contributor) is not None for contributor in top_entities
-        )
-        include_unknown_placeholder = (
-            known_top_avatar_count in (1, 2, 3)
-            and contributor_count > known_top_avatar_count
-        )
-        top_contributor_list: list[RepoPinContributor] = []
-        is_unknown_contributor = False
-        for contributor in top_entities:
-            img = contributor_img(contributor)
+        top_contributors: list[RepoPinContributor] = []
+        is_unknown: bool = False
+        for contributor in res.contributors[:4]:
+            img: RepoPinImgMedia | None = (
+                RepoPinImgMedia(img=contributor.avatar_url, opacity=1.0)
+                if contributor.avatar_url
+                else (
+                    user_img_media
+                    if contributor.is_user and login_user_id is not None
+                    else None
+                )
+            )
             if img is None:
-                if not include_unknown_placeholder or is_unknown_contributor:
+                if is_unknown:
                     continue
-                is_unknown_contributor = True
-                top_contributor_list.append(
+                is_unknown = True
+                top_contributors.append(
                     RepoPinContributor(
                         login=contributor.login,
                         img=None,
@@ -152,16 +149,36 @@ class RepoPinImgData:
                     )
                 )
                 continue
-            top_contributor_list.append(
+            top_contributors.append(
                 RepoPinContributor(
                     login=contributor.login,
                     img=img,
                     is_user=contributor.is_user,
                 )
             )
-        top_contributors = tuple[RepoPinContributor](top_contributor_list)
 
-        return RepoPinImgData(
+        is_private: bool = (
+            repo_data.get(enums.RepoPinsResDictKeys.IS_PRIVATE.value, False) or False
+        )
+        display_url: str = repo_url or ""
+        if is_private:
+            custom_url: str = str(
+                repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value)
+            ).strip()
+            display_url = (
+                str(
+                    repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value, "")
+                ).strip()
+                if urlparse(custom_url).scheme == "https"
+                else cls.repo_pages_url(url=repo_url or "")
+            )
+
+        def total_count(key: enums.RepoPinsResDictKeys) -> int:
+            return (repo_data.get(key.value, {}) or {}).get(
+                enums.RepoPinsResDictKeys.TTL_COUNT.value, 0
+            ) or 0
+
+        return cls(
             repo_name=(
                 f"{repo_owner}/"
                 if user_repo_owner.lower() != repo_owner.lower()
@@ -172,50 +189,19 @@ class RepoPinImgData:
             or 0,
             fork_count=repo_data.get(enums.RepoPinsResDictKeys.FORK_COUNT.value, 0)
             or 0,
-            issue_open_count=(
-                repo_data.get(enums.RepoPinsResDictKeys.ISSUES.value, {}) or {}
-            ).get(enums.RepoPinsResDictKeys.TTL_COUNT.value, 0)
-            or 0,
-            issue_help_count=(
-                repo_data.get(enums.RepoPinsResDictKeys.ISSUES_HELP.value, {}) or {}
-            ).get(enums.RepoPinsResDictKeys.TTL_COUNT.value, 0)
-            or 0,
-            pull_request_count=(
-                repo_data.get(enums.RepoPinsResDictKeys.PULL_REQUESTS.value, {}) or {}
-            ).get(enums.RepoPinsResDictKeys.TTL_COUNT.value, 0)
-            or 0,
-            contributor_count=contributor_count,
-            contribution_perc=contribution_perc,
-            top_contributors=top_contributors,
-            user_top_contributor_idx=user_top_contributor_idx,
+            issue_open_count=total_count(key=enums.RepoPinsResDictKeys.ISSUES),
+            issue_help_count=total_count(key=enums.RepoPinsResDictKeys.ISSUES_HELP),
+            pull_request_count=total_count(key=enums.RepoPinsResDictKeys.PULL_REQUESTS),
+            contributor_count=res.count,
+            contribution_perc=res.contribution_perc,
+            top_contributors=tuple[RepoPinContributor](top_contributors),
+            user_top_contributor_idx=user_idx,
             description=repo_data.get(enums.RepoPinsResDictKeys.DESCRIPTION.value, "")
             or "",
-            url=(
-                repo_data.get(enums.RepoPinsResDictKeys.URL.value, "") or ""
-                if not (
-                    repo_data.get(enums.RepoPinsResDictKeys.IS_PRIVATE.value, False)
-                    or False
-                )
-                else (
-                    str(
-                        repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value, "")
-                    ).strip()
-                    if urlparse(
-                        str(
-                            repo_data.get(enums.RepoPinsResDictKeys.URL_CUSTOM.value)
-                        ).strip()
-                    ).scheme
-                    == "https"
-                    else cls.repo_pages_url(
-                        url=repo_data.get(enums.RepoPinsResDictKeys.URL.value, "") or ""
-                    )
-                )
-            ),
-            primary_language_name=primary_language_dict.get(
-                enums.RepoPinsResDictKeys.NAME.value, ""
-            )
+            url=display_url,
+            primary_language_name=language.get(enums.RepoPinsResDictKeys.NAME.value, "")
             or "",
-            primary_language_color=primary_language_dict.get(
+            primary_language_color=language.get(
                 enums.RepoPinsResDictKeys.COLOR.value, ""
             )
             or "",
@@ -227,16 +213,12 @@ class RepoPinImgData:
             or False,
             is_archived=repo_data.get(enums.RepoPinsResDictKeys.IS_ARCHIVE.value, False)
             or False,
-            is_private=repo_data.get(enums.RepoPinsResDictKeys.IS_PRIVATE.value, False)
-            or False,
-            theme=(
-                theme_name
-                if theme_name
-                else (
-                    enums.RepoPinsImgThemeName.BG_IMG_CONTRAST
-                    if bg_img_media
-                    else enums.RepoPinsImgThemeName.GITHUB_SOFT
-                )
+            is_private=is_private,
+            theme=theme_name
+            or (
+                enums.RepoPinsImgThemeName.BG_IMG_CONTRAST
+                if bg_img_media
+                else enums.RepoPinsImgThemeName.GITHUB_SOFT
             ),
             bg_img=bg_img_media,
             user_img=user_img_media,
@@ -257,7 +239,7 @@ class RepoPinImgData:
             f"{f"\nissues (open, help wanted): {self.issue_help_count}" if self.issue_help_count else ""}"
             f"{f"\npull requests (open): {self.pull_request_count}" if self.pull_request_count else ""}"
             f"{f"\ncontributors (default branch): {self.contributor_count}" if self.contributor_count else ""}"
-            f"{f"\ncontributions (%): {str(round(self.contribution_perc, 2)).rstrip("0").rstrip(".")}" 
+            f"{f"\ncontributions (%): {str(round(self.contribution_perc, 2)).rstrip("0").rstrip(".")}"
             if self.contribution_perc else ""}"
             f"\ntheme: {self.theme.value if self.theme else "None"}"
             f"\nbackground image: {f"\n{str(self.bg_img)}" if self.bg_img else "None\n"}"

@@ -6,10 +6,9 @@ from gh_profile_repo_pins.repo_pins_img.repo_pins_img_data import (
     RepoPinContributor,
     RepoPinImgData,
 )
-from collections.abc import Callable
-
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_media import RepoPinImgMedia
 import gh_profile_repo_pins.repo_pins_enum as enums
+from collections.abc import Callable
 
 
 class RepoPinImg:
@@ -198,19 +197,20 @@ class RepoPinImg:
           </style>""")
 
     def __char_width(self, char: str, font_px: float | int) -> float | int:
-        return font_px * (
+        factor: float | int = (
             0.68
             if char in self.__WIDE_CHARS
-            else (
-                0.28 if char in self.__NARROW_CHARS else (0.33 if char == " " else 0.53)
-            )
+            else 0.28 if char in self.__NARROW_CHARS else 0.33 if char == " " else 0.53
         )
+        return font_px * factor
 
     def __measure(self, txt: str, font_px: float | int) -> float | int:
         if not txt:
             return 0.0
-        ttl: float | int = sum(self.__char_width(c, font_px) for c in txt)
-        return max(0.0, ttl - min(ttl * 0.08, max(0, len(txt) - 1) * (0.02 * font_px)))
+        total: float | int = sum(self.__char_width(char, font_px) for char in txt)
+        return max(
+            0.0, total - min(total * 0.08, max(0, len(txt) - 1) * (0.02 * font_px))
+        )
 
     def __truncate_to_width(self, txt: str, max_w: float | int) -> str:
         if self.__measure(txt=txt, font_px=self.__NAME_SIZE) <= max_w:
@@ -319,6 +319,29 @@ class RepoPinImg:
             f"</g>"
         )
 
+    def __multi_lang_switch(
+        self,
+        input_txt: str,
+        render: Callable[[str, str | None], str],
+    ) -> str:
+        if self.__repo_pin_translator is None:
+            return render(input_txt, None)
+
+        svg_parts: list[str] = ["<switch>"]
+        for lang, translated_txt in self.__repo_pin_translator.translate_all(
+            input_txt=input_txt,
+            is_nllb_trans=self.__is_nllb_trans,
+        ).items():
+            svg_parts.extend(
+                (
+                    f'<g systemLanguage="{lang}">',
+                    render(translated_txt, lang),
+                    "</g>",
+                )
+            )
+        svg_parts.extend(("<g>", render(input_txt, None), "</g></switch>"))
+        return "".join(svg_parts)
+
     def __badge_multi_lang(
         self,
         badge_x: float | int,
@@ -328,41 +351,17 @@ class RepoPinImg:
         badge_w: float | int,
         badge_txt: str,
     ) -> str:
-        if self.__repo_pin_translator is None:
-            return self.__badge(
+        return self.__multi_lang_switch(
+            input_txt=badge_txt,
+            render=lambda txt, _lang: self.__badge(
                 badge_x=badge_x,
                 badge_y=badge_y,
                 badge_h=badge_h,
                 font_size=font_size,
                 badge_w=badge_w,
-                badge_txt=badge_txt,
-            )
-
-        svg_switch: str = "<switch>"
-        for lang, translated_badge_text in self.__repo_pin_translator.translate_all(
-            input_txt=badge_txt, is_nllb_trans=self.__is_nllb_trans
-        ).items():
-            svg_switch += f'<g systemLanguage="{lang}">'
-            svg_switch += self.__badge(
-                badge_x=badge_x,
-                badge_y=badge_y,
-                badge_h=badge_h,
-                font_size=font_size,
-                badge_w=badge_w,
-                badge_txt=translated_badge_text,
-            )
-            svg_switch += "</g>"
-        svg_switch += "<g>"
-        svg_switch += self.__badge(
-            badge_x=badge_x,
-            badge_y=badge_y,
-            badge_h=badge_h,
-            font_size=font_size,
-            badge_w=badge_w,
-            badge_txt=badge_txt,
+                badge_txt=txt,
+            ),
         )
-        svg_switch += "</g></switch>"
-        return svg_switch
 
     def __header(self, header_y: float | int) -> None:
         badge_x, badge_y, badge_h, badge_w, badge_font_size, badge_txt = (
@@ -389,7 +388,7 @@ class RepoPinImg:
         max_width_px: float | int,
         area_height_px: float | int,
     ) -> list[str]:
-        if not description_txt or (area_height_px - self.__DESC_SIZE) < -1e-6:
+        if not description_txt or area_height_px - self.__DESC_SIZE < -1e-6:
             return []
 
         max_lines: int = max(
@@ -398,17 +397,19 @@ class RepoPinImg:
                 3,
                 1
                 + max(
-                    0, int((area_height_px - self.__DESC_SIZE) // self.__DESC_LINE_H)
+                    0,
+                    int((area_height_px - self.__DESC_SIZE) // self.__DESC_LINE_H),
                 ),
             ),
         )
         words: list[str] = description_txt.strip().split(" ")
         lines: list[str] = []
         cur_line: str = ""
+
         for word in words:
-            tmp_line = (cur_line + " " + word).strip() if cur_line else word
-            if self.__measure(txt=tmp_line, font_px=self.__DESC_SIZE) <= max_width_px:
-                cur_line = tmp_line
+            next_line: str = f"{cur_line} {word}".strip() if cur_line else word
+            if self.__measure(txt=next_line, font_px=self.__DESC_SIZE) <= max_width_px:
+                cur_line = next_line
             elif cur_line:
                 lines.append(cur_line)
                 cur_line = word
@@ -417,11 +418,10 @@ class RepoPinImg:
                 for char in word:
                     if (
                         self.__measure(txt=part_word + char, font_px=self.__DESC_SIZE)
-                        <= max_width_px
+                        > max_width_px
                     ):
-                        part_word += char
-                    else:
                         break
+                    part_word += char
                 lines.append(part_word or word[:1])
                 cur_line = word[len(part_word) :].lstrip()
 
@@ -431,36 +431,23 @@ class RepoPinImg:
         if cur_line and len(lines) < max_lines:
             lines.append(cur_line)
 
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
+        lines = lines[:max_lines]
+        if not lines:
+            return lines
 
-        if lines:
-            last_word: str = lines[-1]
-            ell: str = "…"
-            if self.__measure(txt=last_word, font_px=self.__DESC_SIZE) > max_width_px:
-                while (
-                    last_word
-                    and self.__measure(txt=last_word + ell, font_px=self.__DESC_SIZE)
-                    > max_width_px
-                ):
-                    last_word = last_word[:-1]
-                lines[-1] = (last_word + ell) if last_word else ell
-            elif len(" ".join(lines)) < len(" ".join(words)):
-                if (
-                    self.__measure(txt=last_word + ell, font_px=self.__DESC_SIZE)
-                    <= max_width_px
-                ):
-                    lines[-1] = last_word + ell
-                else:
-                    while (
-                        last_word
-                        and self.__measure(
-                            txt=last_word + ell, font_px=self.__DESC_SIZE
-                        )
-                        > max_width_px
-                    ):
-                        last_word = last_word[:-1]
-                    lines[-1] = (last_word + ell) if last_word else ell
+        last_line: str = lines[-1]
+        if self.__measure(
+            txt=last_line, font_px=self.__DESC_SIZE
+        ) > max_width_px or len(" ".join(lines)) < len(" ".join(words)):
+            _ellipsis: str = "…"
+            while (
+                last_line
+                and self.__measure(txt=last_line + _ellipsis, font_px=self.__DESC_SIZE)
+                > max_width_px
+            ):
+                last_line = last_line[:-1]
+            lines[-1] = last_line + _ellipsis if last_line else _ellipsis
+
         return lines
 
     def __parent_repo(self):
@@ -473,27 +460,26 @@ class RepoPinImg:
         description_h: float | int,
         is_rtl: bool = False,
     ) -> str:
-        wrapped_description_lines: list[str] = self.__wrap_lines(
+        lines: list[str] = self.__wrap_lines(
             description_txt=description_txt,
-            max_width_px=(self.__WIDTH - (self.__PADDING * 2)),
+            max_width_px=self.__WIDTH - self.__PADDING * 2,
             area_height_px=max(0.0, description_h),
         )
-
-        svg_txt = str()
-        for i, line in enumerate[str](wrapped_description_lines):
-            svg_txt += (
-                f"<text "
-                f'x="{self.__WIDTH - self.__PADDING if is_rtl else self.__PADDING}" '
-                f'y="{(description_y + self.__DESC_SIZE) + (i * self.__DESC_LINE_H):.2f}" '
-                f'font-size="{self.__DESC_SIZE}" '
-                f'fill="var(--text)" '
-                f'{'direction="rtl" unicode-bidi="plaintext" text-anchor="start" ' if is_rtl else ""}'
-                f">"
-                f"{self.__format_svg_txt(txt=line)}"
-                f"</text>"
-            )
-
-        return svg_txt
+        return "".join(
+            f"<text "
+            f'x="{self.__WIDTH - self.__PADDING if is_rtl else self.__PADDING}" '
+            f'y="{description_y + self.__DESC_SIZE + i * self.__DESC_LINE_H:.2f}" '
+            f'font-size="{self.__DESC_SIZE}" '
+            f'fill="var(--text)" '
+            f"{(
+                'direction="rtl" unicode-bidi="plaintext" text-anchor="start" '
+                if is_rtl
+                else ""
+            )}>"
+            f"{self.__format_svg_txt(line)}"
+            f"</text>"
+            for i, line in enumerate[str](lines)
+        )
 
     def __description_multi_lang(
         self,
@@ -501,36 +487,15 @@ class RepoPinImg:
         description_y: float | int,
         description_h: float | int,
     ) -> str:
-        if self.__repo_pin_translator is None:
-            return self.__description(
-                description_txt=description_txt,
+        return self.__multi_lang_switch(
+            input_txt=description_txt,
+            render=lambda txt, lang: self.__description(
+                description_txt=txt,
                 description_y=description_y,
                 description_h=description_h,
-            )
-
-        multi_lang_descriptions: dict[str, str] = (
-            self.__repo_pin_translator.translate_all(
-                input_txt=description_txt, is_nllb_trans=self.__is_nllb_trans
-            )
+                is_rtl=bool(lang and lang in self.__RTL_LOCALES),
+            ),
         )
-        svg_switch: str = "<switch>"
-        for lang, translated_description in multi_lang_descriptions.items():
-            svg_switch += f'<g systemLanguage="{lang}">'
-            svg_switch += self.__description(
-                description_txt=translated_description,
-                description_y=description_y,
-                description_h=description_h,
-                is_rtl=lang in self.__RTL_LOCALES,
-            )
-            svg_switch += "</g>"
-        svg_switch += "<g>"
-        svg_switch += self.__description(
-            description_txt=description_txt,
-            description_y=description_y,
-            description_h=description_h,
-        )
-        svg_switch += "</g></switch>"
-        return svg_switch
 
     def __body(self, body_y: float | int, body_h: float | int) -> None:
         if self.__repo_pin_data.is_fork and self.__repo_pin_data.parent:
@@ -585,23 +550,7 @@ class RepoPinImg:
         if stats_count <= 0:
             return footer_x
 
-        txt = self.__fmt_footer_stats_str(stats_count=stats_count)
-        width = self.__footer_stats_width(stats_count=stats_count)
-        rendered_icons = "".join(
-            [
-                self.__render_icon(
-                    path_d=stats_icon,
-                    x=footer_x,
-                    y=footer_y - footer_h * 0.85,
-                    size=(
-                        self.__META_SIZE
-                        if not is_collab_icon
-                        else self.__META_SIZE * 0.75
-                    ),
-                )
-                for stats_icon in stats_icons
-            ]
-        )
+        width: float | int = self.__footer_stats_width(stats_count=stats_count)
         self.__svg_str += (
             "<g>"
             f'<rect x="{footer_x:.2f}" '
@@ -609,10 +558,18 @@ class RepoPinImg:
             f'width="{width:.2f}" '
             f'height="{footer_h:.2f}" '
             'fill="transparent" pointer-events="all" style="cursor:pointer;"/>'
-            f"{rendered_icons}"
+            f"{"".join(
+                self.__render_icon(
+                    path_d=stats_icon,
+                    x=footer_x,
+                    y=footer_y - footer_h * 0.85,
+                    size=self.__META_SIZE * (0.75 if is_collab_icon else 1),
+                )
+                for stats_icon in stats_icons
+            )}"
             f'<text x="{footer_x + self.__PADDING:.2f}" '
             f'y="{footer_y:.2f}" font-size="{self.__META_SIZE}" '
-            f'fill="var(--text)">{txt}</text>'
+            f'fill="var(--text)">{self.__fmt_footer_stats_str(stats_count=stats_count)}</text>'
             "</g>"
         )
         return footer_x + width
@@ -703,12 +660,14 @@ class RepoPinImg:
         )
 
     def __footer_issues_width(self) -> float | int:
-        width = self.__footer_stats_width(self.__repo_pin_data.issue_open_count)
+        width: float | int = self.__footer_stats_width(
+            stats_count=self.__repo_pin_data.issue_open_count
+        )
         if self.__repo_pin_data.issue_help_count:
-            help_count = self.__fmt_footer_stats_str(
+            help_count: str = self.__fmt_footer_stats_str(
                 stats_count=self.__repo_pin_data.issue_help_count
             )
-            help_txt = f"({help_count})"
+            help_txt: str = f"({help_count})"
             width += self.__META_SIZE * 0.25 + self.__measure(
                 txt=help_txt, font_px=self.__META_SIZE
             )
@@ -723,7 +682,7 @@ class RepoPinImg:
                 self.__URL_PATH_ISSUES if not self.__repo_pin_data.is_private else None
             ),
         )
-        group_x = footer_x
+        group_x: float | int = footer_x
         footer_x = self.__footer_stats(
             stats_icons=[self.__ICON_ISSUE_INNER, self.__ICON_ISSUE_OUTER],
             stats_count=self.__repo_pin_data.issue_open_count,
@@ -733,7 +692,7 @@ class RepoPinImg:
         )
         if self.__repo_pin_data.issue_help_count:
             footer_x += self.__META_SIZE * 0.25
-            help_count = self.__fmt_footer_stats_str(
+            help_count: str = self.__fmt_footer_stats_str(
                 stats_count=self.__repo_pin_data.issue_help_count
             )
             footer_x = self.__footer_txt(
@@ -748,21 +707,14 @@ class RepoPinImg:
     def __footer_pull_requests(
         self, footer_x: float | int, footer_y: float | int, footer_h: float | int
     ) -> float | int:
-        self.__href_link_open(
-            url=self.__repo_pin_data.url,
-            url_path=(
-                self.__URL_PATH_PULLS if not self.__repo_pin_data.is_private else None
-            ),
-        )
-        footer_x = self.__footer_stats(
-            stats_icons=[self.__ICON_PR],
-            stats_count=self.__repo_pin_data.pull_request_count,
+        return self.__footer_stats_entry(
             footer_x=footer_x,
             footer_y=footer_y,
             footer_h=footer_h,
+            stats_url_path=self.__URL_PATH_PULLS,
+            stats_icon=self.__ICON_PR,
+            stats_count=self.__repo_pin_data.pull_request_count,
         )
-        self.__href_link_close()
-        return footer_x
 
     def __contribution_img(
         self,
@@ -851,6 +803,52 @@ class RepoPinImg:
     ) -> float | int:
         return self.__footer_txt(txt=txt, txt_x=txt_x, footer_y=footer_y)
 
+    def __contributor_avatar_step(self) -> float | int:
+        return self.__contributor_avatar_size() - self.__contributor_avatar_overlap()
+
+    def __contributor_marker_gap(self) -> float | int:
+        return self.__META_SIZE * 0.05
+
+    def __render_contributor(
+        self,
+        contributor: RepoPinContributor | None,
+        footer_x: float | int,
+        footer_y: float | int,
+        footer_h: float | int,
+        clip_id: str,
+        fallback_to_user: bool = False,
+    ) -> None:
+        if contributor is not None and (
+            contributor.is_unknown or contributor.img is None
+        ):
+            self.__unknown_contribution_img(
+                footer_x=footer_x,
+                footer_y=footer_y,
+                footer_h=footer_h,
+                clip_id=f"{clip_id}-unknown",
+            )
+            return
+
+        if contributor is None and not fallback_to_user:
+            return
+
+        self.__contribution_img(
+            img=(
+                contributor.img
+                if contributor is not None and contributor.img is not None
+                else self.__repo_pin_data.user_img
+            ),
+            footer_x=footer_x,
+            footer_y=footer_y,
+            footer_h=footer_h,
+            clip_id=clip_id,
+            is_user=(
+                contributor.is_user
+                if contributor is not None
+                else self.__repo_pin_data.contributor_count == 1
+            ),
+        )
+
     def __contributor_avatar_size(self) -> float | int:
         return self.__META_SIZE * 2
 
@@ -871,40 +869,38 @@ class RepoPinImg:
         user_idx: int | None = getattr(
             self.__repo_pin_data, "user_top_contributor_idx", None
         )
-        return (
-            user_idx is not None
-            and user_idx >= self.__MAX_CONTRIBUTOR_AVATARS
-            and len(getattr(self.__repo_pin_data, "top_contributors", ()))
-            >= self.__MAX_CONTRIBUTOR_AVATARS - 1
-        )
+        return user_idx is not None and user_idx >= self.__MAX_CONTRIBUTOR_AVATARS
 
     def __contributor_overflow_marker_width(self) -> float | int:
         return self.__measure(txt="..", font_px=self.__META_SIZE)
 
     def __contributor_avatar_stack_width(self) -> float | int:
-        if not self.__contributor_avatar_count():
+        avatar_count = self.__contributor_avatar_count()
+        if not avatar_count:
             return 0
+
         avatar_size: float | int = self.__contributor_avatar_size()
+        marker_gap: float | int = self.__contributor_marker_gap()
+        marker_width: float | int = self.__contributor_overflow_marker_width()
+
         if self.__user_outside_top_contributors():
-            marker_gap: float | int = self.__META_SIZE * 0.05
-            return (
+            leading_count: int = min(self.__MAX_CONTRIBUTOR_AVATARS - 1, avatar_count)
+            width: float | int = (
                 (
-                    avatar_size
-                    + (self.__MAX_CONTRIBUTOR_AVATARS - 2)
-                    * (avatar_size - self.__contributor_avatar_overlap())
+                    avatar_size + (leading_count - 1) * self.__contributor_avatar_step()
+                    if leading_count
+                    else 0
                 )
-                + marker_gap
-                + self.__contributor_overflow_marker_width()
-                + marker_gap
+                + marker_gap * 2
+                + marker_width
                 + avatar_size
             )
-        stack_width: float | int = avatar_size + (
-            self.__contributor_avatar_count() - 1
-        ) * (avatar_size - self.__contributor_avatar_overlap())
-        if self.__show_unknown_overflow_marker():
-            marker_gap = self.__META_SIZE * 0.05
-            stack_width += marker_gap + self.__contributor_overflow_marker_width()
-        return stack_width
+        else:
+            width = avatar_size + (avatar_count - 1) * self.__contributor_avatar_step()
+
+        if self.__show_trailing_contributor_overflow_marker():
+            width += marker_gap + marker_width
+        return width
 
     def __has_unknown_contributor_avatar(self) -> bool:
         return any(
@@ -912,28 +908,30 @@ class RepoPinImg:
             for contributor in self.__repo_pin_data.top_contributors
         )
 
-    def __rendered_contributor_avatar_count(self) -> int:
+    def __show_trailing_contributor_overflow_marker(self) -> bool:
         if self.__user_outside_top_contributors():
-            return (
-                min(
-                    self.__MAX_CONTRIBUTOR_AVATARS - 1,
-                    self.__contributor_avatar_count(),
-                )
-                + 1
+            user_idx: int | None = self.__repo_pin_data.user_top_contributor_idx
+            return bool(
+                user_idx is not None
+                and user_idx < self.__repo_pin_data.contributor_count - 1
             )
-        return self.__contributor_avatar_count()
-
-    def __show_unknown_overflow_marker(self) -> bool:
-        return (
-            self.__repo_pin_data.contributor_count
-            > self.__rendered_contributor_avatar_count()
-            and self.__has_unknown_contributor_avatar()
+        if (
+            self.__repo_pin_data.contributor_count == 1
+            and not self.__repo_pin_data.top_contributors
+        ):
+            return False
+        return self.__repo_pin_data.contributor_count > len(
+            self.__repo_pin_data.top_contributors
         )
 
     def __is_contributor_count_visible(self) -> bool:
         return (
-            self.__repo_pin_data.contributor_count > 3
-            or self.__show_unknown_overflow_marker()
+            self.__repo_pin_data.contributor_count > self.__MAX_CONTRIBUTOR_AVATARS
+            or (
+                self.__has_unknown_contributor_avatar()
+                and self.__repo_pin_data.contributor_count
+                > len(self.__repo_pin_data.top_contributors)
+            )
         )
 
     def __footer_contributors_width(self) -> float | int:
@@ -983,9 +981,7 @@ class RepoPinImg:
         content_x: float | int = footer_x + self.__PADDING
         if self.__is_contributor_count_visible():
             content_x = self.__footer_inline_txt(
-                txt=self.__fmt_footer_stats_str(
-                    stats_count=self.__repo_pin_data.contributor_count
-                ),
+                txt=self.__fmt_footer_stats_str(self.__repo_pin_data.contributor_count),
                 txt_x=content_x,
                 footer_y=footer_y,
             )
@@ -998,102 +994,70 @@ class RepoPinImg:
         if not contributors and self.__repo_pin_data.contributor_count == 1:
             contributors = [None]
 
+        marker_gap: float | int = self.__contributor_marker_gap()
+        avatar_size: float | int = self.__contributor_avatar_size()
+        avatar_step: float | int = self.__contributor_avatar_step()
+
         if self.__user_outside_top_contributors():
-            leading_contributors = contributors[: self.__MAX_CONTRIBUTOR_AVATARS - 1]
-            for i, contributor in enumerate[RepoPinContributor | None](
-                leading_contributors
-            ):
-                if contributor is None:
-                    continue
-                avatar_x: float | int = content_x + i * (
-                    self.__contributor_avatar_size()
-                    - self.__contributor_avatar_overlap()
+            leading: list[RepoPinContributor | None] = contributors[
+                : self.__MAX_CONTRIBUTOR_AVATARS - 1
+            ]
+            for i, contributor in enumerate[RepoPinContributor | None](leading):
+                self.__render_contributor(
+                    contributor=contributor,
+                    footer_x=content_x + i * avatar_step,
+                    footer_y=footer_y,
+                    footer_h=footer_h,
+                    clip_id=f"contributor-{i}",
                 )
-                if contributor.is_unknown or contributor.img is None:
-                    self.__unknown_contribution_img(
-                        footer_x=avatar_x,
-                        footer_y=footer_y,
-                        footer_h=footer_h,
-                        clip_id=f"contributor-{i}-unknown",
-                    )
-                else:
-                    self.__contribution_img(
-                        img=contributor.img,
-                        footer_x=avatar_x,
-                        footer_y=footer_y,
-                        footer_h=footer_h,
-                        clip_id=f"contributor-{i}",
-                        is_user=contributor.is_user,
-                    )
-            marker_gap: float | int = self.__META_SIZE * 0.05
-            self.__contribution_img(
-                img=self.__repo_pin_data.user_img,
-                footer_x=self.__footer_inline_txt(
+
+            user_x: float | int = (
+                self.__footer_inline_txt(
                     txt="..",
                     txt_x=(
-                        content_x
-                        + (len(leading_contributors) - 1)
-                        * (
-                            self.__contributor_avatar_size()
-                            - self.__contributor_avatar_overlap()
-                        )
-                        + self.__contributor_avatar_size()
+                        content_x + (len(leading) - 1) * avatar_step + avatar_size
+                        if leading
+                        else content_x
                     )
                     + marker_gap,
                     footer_y=footer_y,
                 )
-                + marker_gap,
+                + marker_gap
+            )
+            self.__contribution_img(
+                img=self.__repo_pin_data.user_img,
+                footer_x=user_x,
                 footer_y=footer_y,
                 footer_h=footer_h,
                 clip_id="contributor-user",
                 is_user=True,
             )
+            if self.__show_trailing_contributor_overflow_marker():
+                self.__footer_inline_txt(
+                    txt="..",
+                    txt_x=user_x + avatar_size + marker_gap,
+                    footer_y=footer_y,
+                )
         else:
             for i, contributor in enumerate[RepoPinContributor | None](contributors):
-                avatar_x = content_x + i * (
-                    self.__contributor_avatar_size()
-                    - self.__contributor_avatar_overlap()
-                )
-                if contributor is not None and (
-                    contributor.is_unknown or contributor.img is None
-                ):
-                    self.__unknown_contribution_img(
-                        footer_x=avatar_x,
-                        footer_y=footer_y,
-                        footer_h=footer_h,
-                        clip_id=f"contributor-{i}-unknown",
-                    )
-                    continue
-                self.__contribution_img(
-                    img=(
-                        contributor.img
-                        if contributor is not None and contributor.img is not None
-                        else self.__repo_pin_data.user_img
-                    ),
-                    footer_x=avatar_x,
+                self.__render_contributor(
+                    contributor=contributor,
+                    footer_x=content_x + i * avatar_step,
                     footer_y=footer_y,
                     footer_h=footer_h,
                     clip_id=f"contributor-{i}",
-                    is_user=(
-                        contributor.is_user
-                        if contributor is not None
-                        else self.__repo_pin_data.contributor_count == 1
-                    ),
+                    fallback_to_user=True,
                 )
 
-            if self.__show_unknown_overflow_marker() and contributors:
+            if self.__show_trailing_contributor_overflow_marker() and contributors:
                 self.__footer_inline_txt(
                     txt="..",
                     txt_x=(
                         content_x
-                        + (len(contributors) - 1)
-                        * (
-                            self.__contributor_avatar_size()
-                            - self.__contributor_avatar_overlap()
-                        )
-                        + self.__contributor_avatar_size()
-                    )
-                    + (self.__META_SIZE * 0.05),
+                        + (len(contributors) - 1) * avatar_step
+                        + avatar_size
+                        + marker_gap
+                    ),
                     footer_y=footer_y,
                 )
 
@@ -1109,8 +1073,13 @@ class RepoPinImg:
             or self.__repo_pin_data.contributor_count <= 1
         ):
             return 0
-        return self.__PADDING + self.__measure(
-            txt=self.__contribution_percentage_text(), font_px=self.__META_SIZE
+        return (
+            self.__PADDING
+            + self.__measure(
+                txt=self.__contribution_percentage_text(), font_px=self.__META_SIZE
+            )
+            + self.__META_SIZE * 0.3
+            + self.__contributor_avatar_size()
         )
 
     def __footer_contribution_stats(
@@ -1133,10 +1102,18 @@ class RepoPinImg:
             y=footer_y - footer_h * 0.85,
             size=self.__META_SIZE,
         )
-        self.__footer_inline_txt(
-            txt=self.__contribution_percentage_text(),
-            txt_x=footer_x + self.__PADDING,
+        self.__contribution_img(
+            img=self.__repo_pin_data.user_img,
+            footer_x=self.__footer_inline_txt(
+                txt=self.__contribution_percentage_text(),
+                txt_x=footer_x + self.__PADDING,
+                footer_y=footer_y,
+            )
+            + self.__META_SIZE * 0.3,
             footer_y=footer_y,
+            footer_h=footer_h,
+            clip_id="contribution-stats-user",
+            is_user=True,
         )
         self.__href_link_close()
         return footer_x + self.__footer_contribution_stats_width()
@@ -1157,55 +1134,69 @@ class RepoPinImg:
     def __footer(self, footer_y: float | int, footer_h: float | int) -> None:
         groups: list[tuple[float | int, Callable[..., float | int]]] = []
 
-        if self.__repo_pin_data.primary_language_name:
-            groups.append(
-                (
-                    self.__footer_primary_language_width(),
-                    self.__footer_primary_language,
-                )
-            )
-        if self.__repo_pin_data.stargazer_count > 0:
-            groups.append(
-                (
-                    self.__footer_stats_width(self.__repo_pin_data.stargazer_count),
-                    self.__footer_stargazers,
-                )
-            )
-        if self.__repo_pin_data.fork_count > 0:
-            groups.append(
-                (
-                    self.__footer_stats_width(self.__repo_pin_data.fork_count),
-                    self.__footer_forks,
-                )
-            )
-        if (
-            self.__repo_pin_data.issue_open_count > 0
-            or self.__repo_pin_data.issue_help_count > 0
-        ):
-            groups.append((self.__footer_issues_width(), self.__footer_issues))
-        if self.__repo_pin_data.pull_request_count > 0:
-            groups.append(
-                (
-                    self.__footer_stats_width(self.__repo_pin_data.pull_request_count),
-                    self.__footer_pull_requests,
-                )
-            )
-        if self.__repo_pin_data.contributor_count > 0:
-            groups.append(
-                (self.__footer_contributors_width(), self.__footer_contributors)
-            )
-        contribution_stats_width = self.__footer_contribution_stats_width()
-        if contribution_stats_width > 0:
-            groups.append((contribution_stats_width, self.__footer_contribution_stats))
+        def add_group(
+            is_visible: bool,
+            width: float | int,
+            renderer: Callable[..., float | int],
+        ) -> None:
+            if is_visible:
+                groups.append((width, renderer))
 
-        gap: float | int = self.__footer_group_gap([width for width, _ in groups])
+        add_group(
+            is_visible=bool(self.__repo_pin_data.primary_language_name),
+            width=self.__footer_primary_language_width(),
+            renderer=self.__footer_primary_language,
+        )
+        add_group(
+            is_visible=self.__repo_pin_data.stargazer_count > 0,
+            width=self.__footer_stats_width(
+                stats_count=self.__repo_pin_data.stargazer_count
+            ),
+            renderer=self.__footer_stargazers,
+        )
+        add_group(
+            is_visible=self.__repo_pin_data.fork_count > 0,
+            width=self.__footer_stats_width(
+                stats_count=self.__repo_pin_data.fork_count
+            ),
+            renderer=self.__footer_forks,
+        )
+        add_group(
+            is_visible=self.__repo_pin_data.issue_open_count > 0
+            or self.__repo_pin_data.issue_help_count > 0,
+            width=self.__footer_issues_width(),
+            renderer=self.__footer_issues,
+        )
+        add_group(
+            is_visible=self.__repo_pin_data.pull_request_count > 0,
+            width=self.__footer_stats_width(
+                stats_count=self.__repo_pin_data.pull_request_count
+            ),
+            renderer=self.__footer_pull_requests,
+        )
+        add_group(
+            is_visible=self.__repo_pin_data.contributor_count > 0,
+            width=self.__footer_contributors_width(),
+            renderer=self.__footer_contributors,
+        )
+        contribution_width: float | int = self.__footer_contribution_stats_width()
+        add_group(
+            is_visible=contribution_width > 0,
+            width=contribution_width,
+            renderer=self.__footer_contribution_stats,
+        )
+
         footer_x: float | int = self.__PADDING
         for i, (_, render_group) in enumerate(groups):
             footer_x = render_group(
-                footer_x=footer_x, footer_y=footer_y, footer_h=footer_h
+                footer_x=footer_x,
+                footer_y=footer_y,
+                footer_h=footer_h,
             )
             if i < len(groups) - 1:
-                footer_x += gap
+                footer_x += self.__footer_group_gap(
+                    widths=[width for width, _ in groups]
+                )
 
     def __bg_img(self) -> None:
         bg_img: RepoPinImgMedia | None = self.__repo_pin_data.bg_img

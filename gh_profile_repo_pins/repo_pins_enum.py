@@ -100,6 +100,7 @@ class RepoPinsResDictKeys(Enum):
     LOCAL_CONTRIBUTORS = "local_contributors"
     CONTRIBUTIONS = "contributions"
     AVATAR_URL = "avatar_url"
+    LAST_COMMIT_AT = "last_commit_at"
     STATS = "stats"
     FORK_COUNT = "forkCount"
     ISSUES = "issues"

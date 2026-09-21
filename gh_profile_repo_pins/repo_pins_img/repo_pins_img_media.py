@@ -1,6 +1,6 @@
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
 import gh_profile_repo_pins.repo_pins_enum as enums
-from requests import get, Response, HTTPError
+from requests import HTTPError, Response, get
 from urllib.parse import urlparse
 from utils.utils import load_img
 from PIL import Image, ImageOps
@@ -28,7 +28,7 @@ class RepoPinImgMedia:
         opacity: float | int = __DEFAULT_OPACITY,
     ) -> None:
         assert img
-        self.__img = img
+        self.__img: str = img
         self.__img_mime: enums.RepoPinsImgMediaImgMime = (
             enums.RepoPinsImgMediaImgMime.PNG
         )
@@ -37,10 +37,8 @@ class RepoPinImgMedia:
             if align and align.lower() in enums.RepoPinsImgMediaImgAlign
             else enums.RepoPinsImgMediaImgAlign(self.__DEFAULT_ALIGN.lower())
         )
-        self.__img_mode: enums.RepoPinsImgMediaImgMode = (
-            enums.RepoPinsImgMediaImgMode(mode.lower())
-            if mode
-            else enums.RepoPinsImgMediaImgMode(self.__DEFAULT_MODE.lower())
+        self.__img_mode: enums.RepoPinsImgMediaImgMode = enums.RepoPinsImgMediaImgMode(
+            (mode or self.__DEFAULT_MODE).lower()
         )
         self.__img_opacity: float | int = (
             opacity
@@ -62,24 +60,20 @@ class RepoPinImgMedia:
         return bool(urlparse(url=self.__img).scheme)
 
     def __decode_img(self, byte_img: bytes) -> Image.Image:
-        if self.__img_mime == enums.RepoPinsImgMediaImgMime.SVG:
-            try:
-                from cairosvg import svg2png
-            except (ImportError, OSError) as err:
-                raise RepoPinImageMediaError(
-                    msg="SVG image conversion requires CairoSVG and the native Cairo library."
-                ) from err
+        if self.__img_mime != enums.RepoPinsImgMediaImgMime.SVG:
+            return Image.open(fp=BytesIO(initial_bytes=byte_img))
 
-            raw_conversion: BytesIO = BytesIO()
-            svg2png(
-                bytestring=byte_img,
-                write_to=raw_conversion,
-            )
-            raw_conversion.seek(0)
+        try:
+            from cairosvg import svg2png
+        except (ImportError, OSError) as err:
+            raise RepoPinImageMediaError(
+                msg="SVG image conversion requires CairoSVG and the native Cairo library."
+            ) from err
 
-            return Image.open(fp=raw_conversion)
-
-        return Image.open(fp=BytesIO(initial_bytes=byte_img))
+        raw_conversion: BytesIO = BytesIO()
+        svg2png(bytestring=byte_img, write_to=raw_conversion)
+        raw_conversion.seek(0)
+        return Image.open(fp=raw_conversion)
 
     def __format_encoded_img(self, byte_img: bytes) -> bytes:
         img_encoder: Image.Image = ImageOps.exif_transpose(
@@ -97,9 +91,12 @@ class RepoPinImgMedia:
         )
         return encoded_img.getvalue()
 
-    def __set_encoded_url(self, encoded_url: str) -> None:
+    def __encode(self, byte_img: bytes) -> None:
+        encoded: str = b64encode(s=self.__format_encoded_img(byte_img=byte_img)).decode(
+            encoding=self.__BASE_64_ENCODING
+        )
         self.__img_encoded_url = (
-            f"data:{self.__img_mime.value.lower()};base64,{encoded_url}"
+            f"data:{self.__img_mime.value.lower()};base64,{encoded}"
         )
 
     def __load_url(self) -> None:
@@ -110,39 +107,32 @@ class RepoPinImgMedia:
             raise RepoPinImageMediaError(
                 msg=f"HTTPError attempting to fetch image URL: {self.__img}."
             )
+
         self.__img_mime = enums.RepoPinsImgMediaImgMime(
             res.headers.get(self.__RES_MIME_HEADER, self.__img_mime.value).lower()
         )
-        self.__set_encoded_url(
-            encoded_url=b64encode(
-                s=self.__format_encoded_img(byte_img=res.content)
-            ).decode(encoding=self.__BASE_64_ENCODING)
-        )
+        self.__encode(byte_img=res.content)
 
     def __load_file(self) -> None:
+        extension: str = self.__img.split(".")[-1][:2].upper()
         try:
-            self.__img_mime = enums.RepoPinsImgMediaImgMime(
-                [
-                    e.value
-                    for e in enums.RepoPinsImgMediaImgMime
-                    if self.__img.split(".")[-1][:2].upper() == e.name[:2]
-                ][0]
+            mime: enums.RepoPinsImgMediaImgMime = next(
+                media_mime
+                for media_mime in enums.RepoPinsImgMediaImgMime
+                if extension == media_mime.name[:2]
             )
-        except IndexError:
+        except StopIteration:
             raise RepoPinImageMediaError(
                 msg=f"Invalid image type. "
-                f"Use one of the valid types: {list(enums.RepoPinsImgMediaImgMime.__members__.keys())}."
+                f"Use one of the valid types: {list[str](enums.RepoPinsImgMediaImgMime.__members__.keys())}."
             )
 
+        self.__img_mime = mime
         try:
             byte_img: bytes = load_img(img_path=self.__img)
         except FileNotFoundError:
             raise RepoPinImageMediaError(msg=f"Image file not found: {self.__img}")
-        self.__set_encoded_url(
-            encoded_url=b64encode(
-                s=self.__format_encoded_img(byte_img=byte_img)
-            ).decode(encoding=self.__BASE_64_ENCODING)
-        )
+        self.__encode(byte_img=byte_img)
 
     @property
     def align(self) -> enums.RepoPinsImgMediaImgAlign:
@@ -161,10 +151,11 @@ class RepoPinImgMedia:
         return self.__img_encoded_url
 
     def load(self) -> None:
-        if self.__img:
-            if self.__is_img_url():
-                self.__load_url()
-            elif self.__img.startswith("data:"):
-                self.__img_encoded_url = self.__img
-            else:
-                self.__load_file()
+        if self.__img_encoded_url is not None:
+            return
+        if self.__is_img_url():
+            self.__load_url()
+        elif self.__img.startswith("data:"):
+            self.__img_encoded_url = self.__img
+        else:
+            self.__load_file()

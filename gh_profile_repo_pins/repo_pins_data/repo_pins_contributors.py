@@ -8,9 +8,13 @@ import gh_profile_repo_pins.repo_pins_enum as enums
 from dataclasses import dataclass
 from typing import Any
 
+ContributorData = dict[str, Any]
+LocalId = tuple[str, set[str], set[str]]
+GitHubId = tuple[str, set[str], set[str], int | None]
+
 
 @dataclass(frozen=True)
-class ResolvedContributor:
+class ResContributor:
     login: str
     names: frozenset[str]
     emails: frozenset[str]
@@ -22,8 +26,8 @@ class ResolvedContributor:
 
 
 @dataclass(frozen=True)
-class ContributorResolution:
-    contributors: tuple[ResolvedContributor, ...]
+class ContributorRes:
+    contributors: tuple[ResContributor, ...]
     contribution_perc: float | int
     user_idx: int | None
 
@@ -32,7 +36,11 @@ class ContributorResolution:
         return len(self.contributors)
 
 
-def _local_id(data: dict[str, Any]) -> tuple[str, set[str], set[str]]:
+def _count(data: ContributorData) -> int:
+    return int(data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0)
+
+
+def _local_id(data: ContributorData) -> LocalId:
     authors: set[str] = norm_vals(
         vals=data.get(enums.RepoPinsResDictKeys.AUTHOR.value, [])
     )
@@ -46,17 +54,16 @@ def _local_id(data: dict[str, Any]) -> tuple[str, set[str], set[str]]:
     )
 
 
-def _github_id(
-    data: dict[str, Any],
-) -> tuple[str, set[str], set[str], int | None]:
-    authors = norm_vals(vals=data.get(enums.RepoPinsResDictKeys.AUTHOR.value, []))
+def _github_id(data: ContributorData) -> GitHubId:
+    authors: set[str] = norm_vals(
+        vals=data.get(enums.RepoPinsResDictKeys.AUTHOR.value, [])
+    )
     authors.update(norm_vals(vals=data.get(enums.RepoPinsResDictKeys.NAME.value)))
-
     login: str = norm_val(val=data.get(enums.RepoPinsResDictKeys.LOGIN.value, ""))
     if login:
         authors.add(login)
 
-    raw_id: int | float | None = data.get("id")
+    raw_id: str | None = data.get("id")
     user_id: int | None = int(raw_id) if raw_id is not None else None
     emails: set[str] = norm_vals(
         vals=data.get(enums.RepoPinsResDictKeys.EMAIL.value, [])
@@ -68,24 +75,24 @@ def _github_id(
     return login, authors, emails, user_id
 
 
-def _is_local_user(
-    data: dict[str, Any],
+def _matches_local_user(
+    authors: set[str],
+    emails: set[str],
     login_username: str,
     login_user_name: str,
     login_user_id: int | None,
 ) -> bool:
-    _, authors, emails = _local_id(data=data)
-    login_username_norm: str = norm_val(val=login_username)
-    login_user_name_norm: str = norm_val(val=login_user_name)
-    account_no_reply_email: str = (
-        f"{login_user_id}+{login_username_norm}@users.noreply.github.com"
-        if login_user_id is not None and login_username_norm
+    username: str = norm_val(val=login_username)
+    user_name: str = norm_val(val=login_user_name)
+    no_reply: str = (
+        f"{login_user_id}+{username}@users.noreply.github.com"
+        if login_user_id is not None and username
         else ""
     )
     return (
-        (bool(login_user_name_norm) and login_user_name_norm in authors)
-        or (bool(login_username_norm) and login_username_norm in authors)
-        or (bool(account_no_reply_email) and account_no_reply_email in emails)
+        (bool(user_name) and user_name in authors)
+        or (bool(username) and username in authors)
+        or (bool(no_reply) and no_reply in emails)
         or (
             login_user_id is not None
             and any(
@@ -97,42 +104,58 @@ def _is_local_user(
     )
 
 
+def _is_local_user(
+    data: ContributorData,
+    login_username: str,
+    login_user_name: str,
+    login_user_id: int | None,
+) -> bool:
+    _, authors, emails = _local_id(data=data)
+    return _matches_local_user(
+        authors=authors,
+        emails=emails,
+        login_username=login_username,
+        login_user_name=login_user_name,
+        login_user_id=login_user_id,
+    )
+
+
 def collapse_local_contributors(
-    contributors: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+    contributors: list[ContributorData],
+) -> list[ContributorData]:
     if len(contributors) <= 1:
         return contributors
 
-    groups = ContributorIdResolver(
+    ids: list[tuple[str, set[str], set[str]]] = [
+        _local_id(data) for data in contributors
+    ]
+    groups: dict[int, list[int]] = ContributorIdResolver(
         obs=[
-            ContributorIdObs.create(
-                names=_local_id(data=data)[1],
-                emails=_local_id(data=data)[2],
-            )
-            for data in contributors
+            ContributorIdObs.create(names=authors, emails=emails)
+            for _, authors, emails in ids
         ]
     ).groups()
 
-    merged_contributors: list[dict[str, Any]] = []
+    result: list[ContributorData] = []
     for idxes in groups.values():
-        merged: dict[str, Any] = {
+        merged: ContributorData = {
             enums.RepoPinsResDictKeys.LOGIN.value: "",
             enums.RepoPinsResDictKeys.STATS.value: 0.0,
+            enums.RepoPinsResDictKeys.CONTRIBUTIONS.value: 0,
             enums.RepoPinsResDictKeys.AUTHOR.value: set(),
             enums.RepoPinsResDictKeys.EMAIL.value: set(),
         }
         for idx in idxes:
-            contributor: dict[str, Any] = contributors[idx]
-            local_login, local_authors, local_emails = _local_id(data=contributor)
-            merged[enums.RepoPinsResDictKeys.STATS.value] = float(
-                merged.get(enums.RepoPinsResDictKeys.STATS.value, 0.0)
-            ) + float(contributor.get(enums.RepoPinsResDictKeys.STATS.value, 0) or 0)
-            merged[enums.RepoPinsResDictKeys.AUTHOR.value].update(local_authors)
-            merged[enums.RepoPinsResDictKeys.EMAIL.value].update(local_emails)
-            if len(local_login) > len(
-                str(merged.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or "")
-            ):
-                merged[enums.RepoPinsResDictKeys.LOGIN.value] = local_login
+            data: dict[str, Any] = contributors[idx]
+            login, authors, emails = ids[idx]
+            merged[enums.RepoPinsResDictKeys.STATS.value] += float(
+                data.get(enums.RepoPinsResDictKeys.STATS.value, 0) or 0
+            )
+            merged[enums.RepoPinsResDictKeys.CONTRIBUTIONS.value] += _count(data)
+            merged[enums.RepoPinsResDictKeys.AUTHOR.value].update(authors)
+            merged[enums.RepoPinsResDictKeys.EMAIL.value].update(emails)
+            if len(login) > len(merged[enums.RepoPinsResDictKeys.LOGIN.value]):
+                merged[enums.RepoPinsResDictKeys.LOGIN.value] = login
 
         if not merged[enums.RepoPinsResDictKeys.LOGIN.value]:
             authors = merged[enums.RepoPinsResDictKeys.AUTHOR.value]
@@ -140,65 +163,73 @@ def collapse_local_contributors(
                 merged[enums.RepoPinsResDictKeys.LOGIN.value] = max(
                     authors, key=lambda value: (len(value), value)
                 )
-        merged_contributors.append(merged)
-    return merged_contributors
+        result.append(merged)
+    return result
 
 
 def dedupe_github_contributors(
-    contributors: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
+    contributors: list[ContributorData],
+) -> list[ContributorData]:
     if len(contributors) <= 1:
         return contributors
 
     ids: list[tuple[str, set[str], set[str], int | None]] = [
-        _github_id(data=data) for data in contributors
+        _github_id(data) for data in contributors
     ]
     groups: dict[int, list[int]] = ContributorIdResolver(
         obs=[
             ContributorIdObs.create(
-                names=authors,
-                emails=emails,
-                login=login,
-                user_id=user_id,
+                names=authors, emails=emails, login=login, user_id=user_id
             )
             for login, authors, emails, user_id in ids
         ]
     ).groups()
 
-    deduped: list[dict[str, Any]] = []
+    res: list[ContributorData] = []
+    avatar_key: str = enums.RepoPinsResDictKeys.AVATAR_URL.value
     for idxes in groups.values():
-        merged: dict[str, Any] = {
+        merged: ContributorData = {
             enums.RepoPinsResDictKeys.LOGIN.value: "",
             enums.RepoPinsResDictKeys.AUTHOR.value: set(),
             enums.RepoPinsResDictKeys.EMAIL.value: set(),
             enums.RepoPinsResDictKeys.CONTRIBUTIONS.value: 0,
+            enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value: "",
         }
+        selected_date: str | None = None
         for idx in idxes:
             data: dict[str, Any] = contributors[idx]
             login, authors, emails, user_id = ids[idx]
             merged[enums.RepoPinsResDictKeys.AUTHOR.value].update(authors)
             merged[enums.RepoPinsResDictKeys.EMAIL.value].update(emails)
-            if login and not merged[enums.RepoPinsResDictKeys.LOGIN.value]:
+
+            profile_date: str = str(
+                data.get(enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value, "") or ""
+            )
+            if (login or user_id is not None or data.get(avatar_key)) and (
+                selected_date is None or profile_date > selected_date
+            ):
+                selected_date = profile_date
                 merged[enums.RepoPinsResDictKeys.LOGIN.value] = str(
                     data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
                 ).strip()
-            if user_id is not None and merged.get("id") is None:
-                merged["id"] = user_id
-            if not merged.get(enums.RepoPinsResDictKeys.AVATAR_URL.value) and data.get(
-                enums.RepoPinsResDictKeys.AVATAR_URL.value
-            ):
-                merged[enums.RepoPinsResDictKeys.AVATAR_URL.value] = data.get(
-                    enums.RepoPinsResDictKeys.AVATAR_URL.value
-                )
+                if user_id is None:
+                    merged.pop("id", None)
+                else:
+                    merged["id"] = user_id
+                if avatar_url := data.get(avatar_key):
+                    merged[avatar_key] = avatar_url
+                else:
+                    merged.pop(avatar_key, None)
+                merged[enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value] = profile_date
+
             merged[enums.RepoPinsResDictKeys.CONTRIBUTIONS.value] = max(
-                int(merged.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0),
-                int(data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0),
+                _count(data=merged), _count(data=data)
             )
-        deduped.append(merged)
-    return deduped
+        res.append(merged)
+    return res
 
 
-def _is_profile_linked(data: dict[str, Any]) -> bool:
+def _is_profile_linked(data: ContributorData) -> bool:
     login, _, _, user_id = _github_id(data=data)
     return bool(
         user_id is not None
@@ -208,15 +239,15 @@ def _is_profile_linked(data: dict[str, Any]) -> bool:
 
 
 def resolve_repo_contributors(
-    repo_data: dict[str, Any],
+    repo_data: ContributorData,
     login_username: str,
     login_user_name: str,
     login_user_id: int | None,
-) -> ContributorResolution:
-    contribution_data: list[dict[str, Any]] = (
+) -> ContributorRes:
+    contribution_data: list[Any] | Any = (
         repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTION.value, []) or []
     )
-    local_contributors: list[dict[str, Any]] = (
+    local_contributors: list[Any] | Any = (
         repo_data.get(enums.RepoPinsResDictKeys.LOCAL_CONTRIBUTORS.value, []) or []
     )
     if not local_contributors:
@@ -226,7 +257,7 @@ def resolve_repo_contributors(
             if enums.RepoPinsResDictKeys.STATS.value in data
         ]
 
-    github_contributors: list[dict[str, Any]] = (
+    github_contributors: list[Any] | Any = (
         repo_data.get(enums.RepoPinsResDictKeys.CONTRIBUTORS.value, []) or []
     )
     if not github_contributors:
@@ -236,50 +267,58 @@ def resolve_repo_contributors(
             if data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value)
         ]
 
-    local_contributors = collapse_local_contributors(contributors=local_contributors)
-    github_contributors = dedupe_github_contributors(contributors=github_contributors)
+    local_contributors = collapse_local_contributors(local_contributors)
+    github_contributors = dedupe_github_contributors(github_contributors)
+    local_ids: list[tuple[str, set[str], set[str]]] = [
+        _local_id(data) for data in local_contributors
+    ]
+    github_ids: list[tuple[str, set[str], set[str], int | None]] = [
+        _github_id(data) for data in github_contributors
+    ]
 
     obs: list[ContributorIdObs] = []
     srcs: list[tuple[str, int]] = []
-
-    for idx, data in enumerate[dict[str, Any]](local_contributors):
-        local_login, local_authors, local_emails = _local_id(data=data)
-        is_user: bool = _is_local_user(
-            data=data,
+    for idx, (_, authors, local_emails) in enumerate[tuple[str, set[str], set[str]]](
+        local_ids
+    ):
+        is_user: bool = _matches_local_user(
+            authors=authors,
+            emails=local_emails,
             login_username=login_username,
             login_user_name=login_user_name,
             login_user_id=login_user_id,
         )
         obs.append(
             ContributorIdObs.create(
-                names=local_authors | ({local_login} if local_login else set()),
+                names=authors,
                 emails=local_emails,
-                login=(login_username if is_user else ""),
-                user_id=(login_user_id if is_user else None),
+                login=login_username if is_user else "",
+                user_id=login_user_id if is_user else None,
             )
         )
         srcs.append(("local", idx))
 
-    for idx, data in enumerate[dict[str, Any]](github_contributors):
-        login, authors, emails, user_id = _github_id(data=data)
+    for idx, (login, authors, github_emails, github_user_id) in enumerate[
+        tuple[str, set[str], set[str], int | None]
+    ](github_ids):
         obs.append(
             ContributorIdObs.create(
                 names=authors,
-                emails=emails,
+                emails=github_emails,
                 login=login,
-                user_id=user_id,
+                user_id=github_user_id,
             )
         )
         srcs.append(("github", idx))
 
     if not obs:
-        return ContributorResolution(
-            contributors=(), contribution_perc=0, user_idx=None
-        )
+        return ContributorRes((), 0, None)
 
-    groups: dict[int, list[int]] = ContributorIdResolver(obs=obs).groups()
+    groups: dict[int, list[int]] = ContributorIdResolver(
+        obs=obs, is_mult_profile_merge=True
+    ).groups()
     login_username_norm: str = norm_val(val=login_username)
-    resolved: list[ResolvedContributor] = []
+    resolved: list[ResContributor] = []
 
     for idxes in groups.values():
         local_idxes: list[int] = [
@@ -289,58 +328,74 @@ def resolve_repo_contributors(
             srcs[idx][1] for idx in idxes if srcs[idx][0] == "github"
         ]
 
-        if local_contributors and not local_idxes:
-            is_linked: bool = any(
+        if (
+            local_contributors
+            and not local_idxes
+            and not any(
                 _is_profile_linked(data=github_contributors[idx])
                 for idx in github_idxes
             )
-            if not is_linked:
-                continue
+        ):
+            continue
 
         names: set[str] = set()
-        emails = set()
+        emails: set[str] = set()
         local_logins: list[str] = []
         stats: float | int = 0.0
+        local_commit_count: int = 0
         is_user = False
+
         for idx in local_idxes:
-            data = local_contributors[idx]
-            local_login, local_authors, local_emails = _local_id(data=data)
-            names.update(local_authors)
+            login, authors, local_emails = local_ids[idx]
+            names.update(authors)
             emails.update(local_emails)
-            if local_login:
-                local_logins.append(local_login)
+            if login:
+                local_logins.append(login)
+
+            data: Any = local_contributors[idx]
             stats += float(data.get(enums.RepoPinsResDictKeys.STATS.value, 0) or 0)
-            if _is_local_user(
-                data=data,
+            local_commit_count += _count(data=data)
+            is_user |= _matches_local_user(
+                authors=authors,
+                emails=local_emails,
                 login_username=login_username,
                 login_user_name=login_user_name,
                 login_user_id=login_user_id,
+            )
+
+        selected_profile: tuple[ContributorData, str] | None = None
+        github_commit_count: int = 0
+        for idx in github_idxes:
+            login, authors, github_emails, github_user_id = github_ids[idx]
+            names.update(authors)
+            emails.update(github_emails)
+
+            data = github_contributors[idx]
+            profile_date = str(
+                data.get(enums.RepoPinsResDictKeys.LAST_COMMIT_AT.value, "") or ""
+            )
+            if (login or github_user_id is not None) and (
+                selected_profile is None or profile_date > selected_profile[1]
             ):
-                is_user = True
+                selected_profile = data, profile_date
+
+            github_commit_count += _count(data)
+            is_user |= bool(login_username_norm and login == login_username_norm)
 
         github_login: str = ""
         avatar_url: str | None = None
-        user_id = None
-        commit_count: int = 0
-        for idx in github_idxes:
-            data = github_contributors[idx]
-            login, github_authors, github_emails, github_user_id = _github_id(data=data)
-            names.update(github_authors)
-            emails.update(github_emails)
-            if login and not github_login:
-                github_login = str(
-                    data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
-                ).strip()
-            if github_user_id is not None and user_id is None:
-                user_id = github_user_id
-            if not avatar_url and data.get(enums.RepoPinsResDictKeys.AVATAR_URL.value):
-                avatar_url = str(data[enums.RepoPinsResDictKeys.AVATAR_URL.value])
-            commit_count = max(
-                commit_count,
-                int(data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0),
+        selected_user_id: int | None = None
+        if selected_profile is not None:
+            data, _ = selected_profile
+            github_login = str(
+                data.get(enums.RepoPinsResDictKeys.LOGIN.value, "") or ""
+            ).strip()
+            raw_user_id: str | None = data.get("id")
+            selected_user_id = int(raw_user_id) if raw_user_id is not None else None
+            raw_avatar_url: str | None = data.get(
+                enums.RepoPinsResDictKeys.AVATAR_URL.value
             )
-            if login_username_norm and login == login_username_norm:
-                is_user = True
+            avatar_url = str(raw_avatar_url) if raw_avatar_url else None
 
         login = github_login
         if not login and local_logins:
@@ -351,22 +406,34 @@ def resolve_repo_contributors(
             login = "unknown"
 
         resolved.append(
-            ResolvedContributor(
+            ResContributor(
                 login=login,
                 names=frozenset[str](names),
                 emails=frozenset[str](emails),
-                user_id=user_id,
+                user_id=selected_user_id,
                 avatar_url=avatar_url,
                 stats=stats,
-                commit_count=commit_count,
+                commit_count=(
+                    local_commit_count
+                    if bool(local_idxes)
+                    and all(
+                        enums.RepoPinsResDictKeys.CONTRIBUTIONS.value
+                        in local_contributors[idx]
+                        for idx in local_idxes
+                    )
+                    else github_commit_count
+                ),
                 is_user=is_user,
             )
         )
 
-    has_local_stats: bool = bool(local_contributors)
     resolved.sort(
         key=lambda contributor: (
-            contributor.stats if has_local_stats else float(contributor.commit_count),
+            (
+                contributor.stats
+                if bool(local_contributors)
+                else float(contributor.commit_count)
+            ),
             contributor.commit_count,
             contributor.login.casefold(),
         ),
@@ -376,22 +443,19 @@ def resolve_repo_contributors(
     user_idx: int | None = next(
         (
             idx
-            for idx, contributor in enumerate[ResolvedContributor](resolved)
+            for idx, contributor in enumerate[ResContributor](resolved)
             if contributor.is_user
         ),
         None,
     )
     contribution_perc: float | int = 0
-    is_perc_available: bool = any(
-        enums.RepoPinsResDictKeys.STATS.value in data for data in contribution_data
-    )
-    if is_perc_available:
+    if any(enums.RepoPinsResDictKeys.STATS.value in data for data in contribution_data):
         total_stats: float | int = sum(contributor.stats for contributor in resolved)
         if total_stats and user_idx is not None:
             contribution_perc = resolved[user_idx].stats / total_stats * 100
 
-    return ContributorResolution(
-        contributors=tuple[ResolvedContributor](resolved),
+    return ContributorRes(
+        contributors=tuple[ResContributor](resolved),
         contribution_perc=contribution_perc,
         user_idx=user_idx,
     )

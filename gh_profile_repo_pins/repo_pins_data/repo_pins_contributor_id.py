@@ -1,5 +1,5 @@
-from typing import Iterable, Sequence, Any
 from dataclasses import dataclass
+from typing import Sequence
 from re import sub
 
 ProfileKey = tuple[str, str]
@@ -31,19 +31,22 @@ class ContributorIdObs:
     def linked_key(self) -> ProfileKey | None:
         if self.user_id is not None:
             return "user_id", str(self.user_id)
-        if self.login:
-            return "login", self.login
-        return None
+        return ("login", self.login) if self.login else None
 
 
 class ContributorIdResolver:
-    def __init__(self, obs: Sequence[ContributorIdObs]) -> None:
+    def __init__(
+        self,
+        obs: Sequence[ContributorIdObs],
+        is_mult_profile_merge: bool = False,
+    ) -> None:
         self.__obs: list[ContributorIdObs] = list(obs)
+        self.__is_mult_profile_merge: bool = is_mult_profile_merge
         self.__parent: list[int] = list(range(len(self.__obs)))
         self.__rank: list[int] = [0] * len(self.__obs)
-        self.__linked_profiles: list[set[ProfileKey | None]] = [
-            ({obs.linked_key} if obs.linked_key is not None else set())
-            for obs in self.__obs
+        self.__linked_profiles: list[set[ProfileKey]] = [
+            {key} if (key := item.linked_key) is not None else set()
+            for item in self.__obs
         ]
 
     def find(self, idx: int) -> int:
@@ -52,16 +55,25 @@ class ContributorIdResolver:
             idx = self.__parent[idx]
         return idx
 
-    def union(self, lft: int, rht: int) -> bool:
-        left_root = self.find(idx=lft)
-        right_root = self.find(idx=rht)
+    def union(
+        self,
+        lft: int,
+        rht: int,
+        is_mult_profile_merge: bool = False,
+    ) -> bool:
+        left_root, right_root = self.find(lft), self.find(rht)
         if left_root == right_root:
             return True
 
-        combined_profiles: set[tuple[Any, ...] | None] = (
-            self.__linked_profiles[left_root] | self.__linked_profiles[right_root]
-        )
-        if len(combined_profiles) > 1:
+        left_profiles: set[tuple[str, str]] = self.__linked_profiles[left_root]
+        right_profiles: set[tuple[str, str]] = self.__linked_profiles[right_root]
+        combined_profiles: set[tuple[str, str]] = left_profiles | right_profiles
+        if (
+            left_profiles
+            and right_profiles
+            and len(combined_profiles) > 1
+            and not is_mult_profile_merge
+        ):
             return False
 
         if self.__rank[left_root] < self.__rank[right_root]:
@@ -73,61 +85,53 @@ class ContributorIdResolver:
         return True
 
     def groups(self) -> dict[int, list[int]]:
-        grouped: dict[int, list[int]] = {}
+        groups: dict[int, list[int]] = {}
         for idx, root in enumerate[int](self.resolve()):
-            grouped.setdefault(root, []).append(idx)
-        return grouped
+            groups.setdefault(root, []).append(idx)
+        return groups
 
     def __merge_linked_profiles(self) -> None:
-        profile_idx: dict[ProfileKey, int] = {}
-        for idx, obs in enumerate[ContributorIdObs](self.__obs):
-            profile: tuple[Any, ...] | None = obs.linked_key
-            if profile is None:
+        seen: dict[ProfileKey, int] = {}
+        for idx, item in enumerate[ContributorIdObs](self.__obs):
+            if (profile := item.linked_key) is None:
                 continue
-            existing_profile: int | None = profile_idx.get(profile)
-            if existing_profile is not None:
-                self.union(lft=idx, rht=existing_profile)
-            else:
-                profile_idx[profile] = idx
+            first_idx = seen.setdefault(profile, idx)
+            if first_idx != idx:
+                self.union(idx, first_idx)
 
     def __merge_exact_vals(self, attr: str) -> None:
-        val_idx: dict[str, int] = {}
-        for idx, obs in enumerate[ContributorIdObs](self.__obs):
-            for val in getattr(obs, attr):
-                existing_val = val_idx.get(val)
-                if existing_val is not None:
-                    self.union(lft=idx, rht=existing_val)
-                else:
-                    val_idx[val] = idx
+        seen: dict[str, int] = {}
+        is_mult_profile_merge: bool = attr == "emails" and self.__is_mult_profile_merge
+        for idx, item in enumerate[ContributorIdObs](self.__obs):
+            for value in getattr(item, attr):
+                first_idx: int = seen.setdefault(value, idx)
+                if first_idx != idx:
+                    self.union(idx, first_idx, is_mult_profile_merge)
 
     def __merge_exact_names(self) -> None:
         name_groups: dict[str, list[int]] = {}
-        for idx, obs in enumerate[ContributorIdObs](self.__obs):
-            for name in obs.names:
+        for idx, item in enumerate[ContributorIdObs](self.__obs):
+            for name in item.names:
                 name_groups.setdefault(name, []).append(idx)
 
         for idxes in name_groups.values():
             if (
-                len(
-                    set().union(
-                        *(
-                            self.__linked_profiles[root]
-                            for root in {self.find(idx=idx) for idx in idxes}
-                        )
-                    )
+                sum(
+                    bool(self.__linked_profiles[root])
+                    for root in {self.find(idx) for idx in idxes}
                 )
                 > 1
             ):
                 continue
             for idx in idxes[1:]:
-                self.union(lft=idxes[0], rht=idx)
+                self.union(idxes[0], idx)
 
     def __root_names(self) -> dict[int, set[str]]:
-        root_names: dict[int, set[str]] = {}
-        for idx, obs in enumerate[ContributorIdObs](self.__obs):
-            if obs.names:
-                root_names.setdefault(self.find(idx=idx), set()).update(obs.names)
-        return root_names
+        names: dict[int, set[str]] = {}
+        for idx, item in enumerate[ContributorIdObs](self.__obs):
+            if item.names:
+                names.setdefault(self.find(idx), set()).update(item.names)
+        return names
 
     def __merge_name_aliases(self) -> None:
         while True:
@@ -142,34 +146,32 @@ class ContributorIdResolver:
                         continue
                     score: float | int = max(
                         (
-                            alias_score(name, other_name)
+                            alias_score(lft=name, rht=other_name)
                             for name in names
                             for other_name in other_names
                         ),
                         default=0.0,
                     )
                     if score > best_score:
-                        best_score = score
-                        best_roots = [other_root]
+                        best_score, best_roots = score, [other_root]
                     elif score > 0 and score == best_score:
                         best_roots.append(other_root)
-                if best_score > 0 and len(set[int](best_roots)) == 1:
+                if best_score > 0 and len(best_roots) == 1:
                     choices[root] = best_roots[0]
 
-            is_merged_any: bool = False
-            handled: set[tuple[int, ...]] = set()
+            is_merged: bool = False
+            handled: set[tuple[int, int]] = set()
             for root, other_root in choices.items():
                 if choices.get(other_root) != root:
                     continue
-                pair: tuple[int, ...] = tuple(
-                    sorted((self.find(idx=root), self.find(idx=other_root)))
-                )
-                if pair[0] == pair[1] or pair in handled:
+                left_root, right_root = sorted((self.find(root), self.find(other_root)))
+                pair = (left_root, right_root)
+                if left_root == right_root or pair in handled:
                     continue
                 handled.add(pair)
-                if self.union(lft=pair[0], rht=pair[1]):
-                    is_merged_any = True
-            if not is_merged_any:
+                is_merged |= self.union(lft=left_root, rht=right_root)
+
+            if not is_merged:
                 return
 
     def resolve(self) -> list[int]:
@@ -179,7 +181,7 @@ class ContributorIdResolver:
         self.__merge_exact_vals(attr="emails")
         self.__merge_exact_names()
         self.__merge_name_aliases()
-        return [self.find(idx=i) for i in range(len(self.__obs))]
+        return [self.find(idx=idx) for idx in range(len(self.__obs))]
 
 
 def norm_val(val: object | None) -> str:
@@ -189,12 +191,13 @@ def norm_val(val: object | None) -> str:
 def norm_vals(vals: object | None) -> set[str]:
     if vals is None:
         return set()
-    iterable: Iterable[object]
-    if isinstance(vals, (set, frozenset, list, tuple)):
-        iterable = vals
-    else:
-        iterable = (vals,)
-    return {norm for val in iterable if (norm := norm_val(val=val))}
+    return {
+        normalized
+        for val in (
+            vals if isinstance(vals, (set, frozenset, list, tuple)) else (vals,)
+        )
+        if (normalized := norm_val(val))
+    }
 
 
 def name_tokens(val: str) -> frozenset[str]:
@@ -206,16 +209,17 @@ def name_tokens(val: str) -> frozenset[str]:
 
 
 def alias_score(lft: str, rht: str) -> float | int:
-    left_tokens: frozenset[str] = name_tokens(val=lft)
-    right_tokens: frozenset[str] = name_tokens(val=rht)
+    left_tokens, right_tokens = name_tokens(lft), name_tokens(rht)
     if not left_tokens or not right_tokens or left_tokens == right_tokens:
         return 0.0
+
     if left_tokens < right_tokens:
         shorter, longer = left_tokens, right_tokens
     elif right_tokens < left_tokens:
         shorter, longer = right_tokens, left_tokens
     else:
         return 0.0
+
     if len(shorter) == 1 and len(next(iter(shorter))) < 5:
         return 0.0
     return len(shorter) / len(longer)
