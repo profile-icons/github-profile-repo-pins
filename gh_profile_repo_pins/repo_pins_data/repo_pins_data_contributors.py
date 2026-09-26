@@ -1,16 +1,17 @@
-from gh_profile_repo_pins.repo_pins_data.repo_pins_contributor_id import (
+from gh_profile_repo_pins.repo_pins_data.repo_pins_data_contributor_id import (
     ContributorIdObs,
     ContributorIdResolver,
     norm_val,
     norm_vals,
 )
 import gh_profile_repo_pins.repo_pins_enum as enums
+from re import fullmatch, match, Match
 from dataclasses import dataclass
 from typing import Any
 
 ContributorData = dict[str, Any]
-LocalId = tuple[str, set[str], set[str]]
 GitHubId = tuple[str, set[str], set[str], int | None]
+LocalId = tuple[str, set[str], set[str]]
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,62 @@ class ContributorRes:
 
 def _count(data: ContributorData) -> int:
     return int(data.get(enums.RepoPinsResDictKeys.CONTRIBUTIONS.value, 0) or 0)
+
+
+def _gh_login_candidate(val: str) -> str:
+    val = str(val or "").strip()
+    if not val or len(val) > 39:
+        return ""
+    if not fullmatch(
+        pattern=r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?", string=val
+    ):
+        return ""
+    return val
+
+
+def _local_profile_hint(
+    login: str,
+    authors: set[str],
+    emails: set[str],
+) -> tuple[str, int | None, str | None]:
+    for email in sorted(emails):
+        no_reply: Match[str] | None = match(
+            pattern=r"^(?:(\d+)\+)?([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)@users\.noreply\.github\.com$",
+            string=email,
+            flags=0,
+        )
+        if not no_reply:
+            continue
+        user_id, user_login = no_reply.groups()
+        if user_id:
+            user_id = int(user_id)
+            return (
+                user_login,
+                user_id,
+                f"https://avatars.githubusercontent.com/u/{user_id}?v=4",
+            )
+        return (
+            user_login,
+            None,
+            f"https://github.com/{user_login}.png?size=80",
+        )
+
+    candidates: tuple[str, *tuple[str, ...]] = (
+        login,
+        *sorted(
+            authors,
+            key=lambda val: (len(val), val),
+            reverse=True,
+        ),
+    )
+    for candidate in candidates:
+        if user_login := _gh_login_candidate(val=candidate):
+            return (
+                user_login,
+                None,
+                f"https://github.com/{user_login}.png?size=80",
+            )
+    return "", None, None
 
 
 def _local_id(data: ContributorData) -> LocalId:
@@ -318,7 +375,7 @@ def resolve_repo_contributors(
         obs=obs, is_mult_profile_merge=True
     ).groups()
     login_username_norm: str = norm_val(val=login_username)
-    resolved: list[ResContributor] = []
+    res: list[ResContributor] = []
 
     for idxes in groups.values():
         local_idxes: list[int] = [
@@ -328,14 +385,7 @@ def resolve_repo_contributors(
             srcs[idx][1] for idx in idxes if srcs[idx][0] == "github"
         ]
 
-        if (
-            local_contributors
-            and not local_idxes
-            and not any(
-                _is_profile_linked(data=github_contributors[idx])
-                for idx in github_idxes
-            )
-        ):
+        if local_contributors and not local_idxes:
             continue
 
         names: set[str] = set()
@@ -402,10 +452,23 @@ def resolve_repo_contributors(
             login = max(local_logins, key=lambda value: (len(value), value))
         if not login and names:
             login = max(names, key=lambda value: (len(value), value))
+        if selected_profile is None and local_idxes:
+            profile_login, profile_user_id, profile_avatar_url = _local_profile_hint(
+                login=login,
+                authors=names,
+                emails=emails,
+            )
+            if profile_login:
+                login = profile_login
+            if selected_user_id is None:
+                selected_user_id = profile_user_id
+            if avatar_url is None:
+                avatar_url = profile_avatar_url
+
         if not login:
             login = "unknown"
 
-        resolved.append(
+        res.append(
             ResContributor(
                 login=login,
                 names=frozenset[str](names),
@@ -427,7 +490,7 @@ def resolve_repo_contributors(
             )
         )
 
-    resolved.sort(
+    res.sort(
         key=lambda contributor: (
             (
                 contributor.stats
@@ -443,19 +506,19 @@ def resolve_repo_contributors(
     user_idx: int | None = next(
         (
             idx
-            for idx, contributor in enumerate[ResContributor](resolved)
+            for idx, contributor in enumerate[ResContributor](res)
             if contributor.is_user
         ),
         None,
     )
     contribution_perc: float | int = 0
     if any(enums.RepoPinsResDictKeys.STATS.value in data for data in contribution_data):
-        total_stats: float | int = sum(contributor.stats for contributor in resolved)
+        total_stats: float | int = sum(contributor.stats for contributor in res)
         if total_stats and user_idx is not None:
-            contribution_perc = resolved[user_idx].stats / total_stats * 100
+            contribution_perc = res[user_idx].stats / total_stats * 100
 
     return ContributorRes(
-        contributors=tuple[ResContributor](resolved),
+        contributors=tuple[ResContributor](res),
         contribution_perc=contribution_perc,
         user_idx=user_idx,
     )

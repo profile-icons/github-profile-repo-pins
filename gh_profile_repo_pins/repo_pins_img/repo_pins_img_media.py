@@ -1,6 +1,6 @@
 from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
+from requests import Response, RequestException, get
 import gh_profile_repo_pins.repo_pins_enum as enums
-from requests import HTTPError, Response, get
 from urllib.parse import urlparse
 from utils.utils import load_img
 from PIL import Image, ImageOps
@@ -103,10 +103,10 @@ class RepoPinImgMedia:
         try:
             res: Response = get(url=self.__img, timeout=5)
             res.raise_for_status()
-        except HTTPError:
+        except RequestException as err:
             raise RepoPinImageMediaError(
-                msg=f"HTTPError attempting to fetch image URL: {self.__img}."
-            )
+                msg=f"Error attempting to fetch image URL: {self.__img}."
+            ) from err
 
         self.__img_mime = enums.RepoPinsImgMediaImgMime(
             res.headers.get(self.__RES_MIME_HEADER, self.__img_mime.value).lower()

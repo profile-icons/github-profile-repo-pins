@@ -101,6 +101,8 @@ class RepoPinsResDictKeys(Enum):
     CONTRIBUTIONS = "contributions"
     AVATAR_URL = "avatar_url"
     LAST_COMMIT_AT = "last_commit_at"
+    PROFILE_COMMIT = "profile_commit_sha"
+    PROFILE_COMMITS = "profile_commit_shas"
     STATS = "stats"
     FORK_COUNT = "forkCount"
     ISSUES = "issues"

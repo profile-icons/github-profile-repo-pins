@@ -4,8 +4,10 @@ from gh_profile_repo_pins.repo_pins_exceptions import (
     RepoPinImageThemeError,
     RepoPinStatsError,
 )
-from gh_profile_repo_pins.repo_pins_data.repo_pins_api import GitHubApiClient
-from gh_profile_repo_pins.repo_pins_data.repo_pins_stats import RepoPinStats
+from gh_profile_repo_pins.repo_pins_data.api.repo_pins_data_api_client import (
+    GitHubApiClient,
+)
+from gh_profile_repo_pins.repo_pins_data.stats.repo_pins_data_stats import RepoPinStats
 from gh_profile_repo_pins.repo_pins_generate import GenerateRepoPins
 from utils.utils import Logger, get_logger, set_git_creds
 import gh_profile_repo_pins.repo_pins_enum as enums
@@ -53,7 +55,7 @@ class ReadMeRepoPins:
             user_name=self.__gh_api_client.user_name,
             user_id=self.__gh_api_client.user_id,
         )
-        self.__repo_pins: list[dict[str, str]] = []
+        self.__repo_pins: list[dict[str, Any]] = []
         self.__theme: str | dict | None = theme
         self.__bg_img: dict | str | None = bg_img
 
@@ -207,14 +209,28 @@ class ReadMeRepoPins:
                 self.__repo_pins.extend(contributed_repos)
 
             self.__order_repos_by_preference()
-            self.__repo_pins = self.__gh_api_client.fetch_contributor_stats(
-                repo_list=self.__repo_pins
-            )
+            if self.__is_contribution_stats:
+                for repo_dict in self.__repo_pins:
+                    repo_dict.setdefault(
+                        enums.RepoPinsResDictKeys.CONTRIBUTORS.value, []
+                    )
+                    repo_dict.setdefault(
+                        enums.RepoPinsResDictKeys.CONTRIBUTION.value, []
+                    )
+            else:
+                self.__repo_pins = self.__gh_api_client.fetch_contributor_stats(
+                    repo_list=self.__repo_pins
+                )
+
             self.__repo_pins = self.__repo_stats.fetch_contribution_stats(
                 repo_list=self.__repo_pins,
-                is_percentage_stats=self.__is_contribution_stats,
-                raise_errors=self.__is_contribution_stats,
+                is_contribution_stats=self.__is_contribution_stats,
+                is_raise_err=self.__is_contribution_stats,
             )
+            if self.__is_contribution_stats:
+                self.__repo_pins = self.__gh_api_client.get_contributor_profiles(
+                    repo_list=self.__repo_pins
+                )
             self.__log.info(
                 msg=f"Total API fetch cost: {self.__gh_api_client.fetch_cost}"
             )

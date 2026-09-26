@@ -7,6 +7,7 @@ from gh_profile_repo_pins.repo_pins_img.repo_pins_img_data import (
     RepoPinImgData,
 )
 from gh_profile_repo_pins.repo_pins_img.repo_pins_img_media import RepoPinImgMedia
+from gh_profile_repo_pins.repo_pins_exceptions import RepoPinImageMediaError
 import gh_profile_repo_pins.repo_pins_enum as enums
 from collections.abc import Callable
 
@@ -117,7 +118,8 @@ class RepoPinImg:
 
     __ICON_STATS: str = (
         "M1.75 1a.75.75 0 0 1 .75.75V13.5h11.75a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 14.25V1.75A.75.75 0 0 1 1.75 1Z "
-        "M14.53 4.53a.75.75 0 0 0-1.06-1.06L9.25 7.69 7.03 5.47a.75.75 0 0 0-1.06 0L3.22 8.22a.75.75 0 1 0 1.06 1.06L6.5 7.06l2.22 2.22a.75.75 0 0 0 1.06 0l4.75-4.75Z"
+        "M14.53 4.53a.75.75 0 0 0-1.06-1.06L9.25 7.69 7.03 5.47a.75.75 0 0 0-1.06 0L3.22 8.22a.75.75 0 1 0 1.06 "
+        "1.06L6.5 7.06l2.22 2.22a.75.75 0 0 0 1.06 0l4.75-4.75Z"
     )
 
     __URL_PATH_STARS: str = "stargazers"
@@ -832,22 +834,30 @@ class RepoPinImg:
         if contributor is None and not fallback_to_user:
             return
 
-        self.__contribution_img(
-            img=(
-                contributor.img
-                if contributor is not None and contributor.img is not None
-                else self.__repo_pin_data.user_img
-            ),
-            footer_x=footer_x,
-            footer_y=footer_y,
-            footer_h=footer_h,
-            clip_id=clip_id,
-            is_user=(
-                contributor.is_user
-                if contributor is not None
-                else self.__repo_pin_data.contributor_count == 1
-            ),
-        )
+        try:
+            self.__contribution_img(
+                img=(
+                    contributor.img
+                    if contributor is not None and contributor.img is not None
+                    else self.__repo_pin_data.user_img
+                ),
+                footer_x=footer_x,
+                footer_y=footer_y,
+                footer_h=footer_h,
+                clip_id=clip_id,
+                is_user=(
+                    contributor.is_user
+                    if contributor is not None
+                    else self.__repo_pin_data.contributor_count == 1
+                ),
+            )
+        except RepoPinImageMediaError:
+            self.__unknown_contribution_img(
+                footer_x=footer_x,
+                footer_y=footer_y,
+                footer_h=footer_h,
+                clip_id=f"{clip_id}-unavailable",
+            )
 
     def __contributor_avatar_size(self) -> float | int:
         return self.__META_SIZE * 2

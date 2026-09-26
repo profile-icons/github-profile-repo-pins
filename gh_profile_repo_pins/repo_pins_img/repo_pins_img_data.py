@@ -1,4 +1,4 @@
-from gh_profile_repo_pins.repo_pins_data.repo_pins_contributors import (
+from gh_profile_repo_pins.repo_pins_data.repo_pins_data_contributors import (
     ContributorRes,
     resolve_repo_contributors,
     ResContributor,
