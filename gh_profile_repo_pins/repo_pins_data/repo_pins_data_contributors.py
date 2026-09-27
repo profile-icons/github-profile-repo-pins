@@ -104,10 +104,22 @@ def _local_id(data: ContributorData) -> LocalId:
     login: str = norm_val(val=data.get(enums.RepoPinsResDictKeys.LOGIN.value, ""))
     if login:
         authors.add(login)
+
+    emails: set[str] = norm_vals(vals=data.get(enums.RepoPinsResDictKeys.EMAIL.value, []))
+    for email in emails:
+        no_reply: Match[str] | None = match(
+            pattern=r"^(?:(\d+)\+)?([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)@users\.noreply\.github\.com$",
+            string=email,
+            flags=0,
+        )
+        if no_reply:
+            _, gh_login = no_reply.groups()
+            authors.add(norm_val(val=gh_login))
+
     return (
         login,
         authors,
-        norm_vals(vals=data.get(enums.RepoPinsResDictKeys.EMAIL.value, [])),
+        emails,
     )
 
 

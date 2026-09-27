@@ -36,6 +36,7 @@ class RepoPinStatsConfig:
             "vendor",
             "trainedagents",
             "checkpoints",
+            "venv",
             "wandb",
             "mlruns",
         }
