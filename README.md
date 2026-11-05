@@ -4,10 +4,10 @@ Generate configurable public/private repository pin visualizations for GitHub us
 
 * (optional) dynamic ordering
 * (optional) selection of any public and (authorized) private repository
-* (optional) themes - select from [existing](https://github.com/profile-icons/readme-repo-pins/blob/main/files/themes.json), or [create your own](https://github.com/profile-icons/readme-repo-pins/issues/1)
+* (optional) themes - select from existing, or contribute to the [themes JSON file](https://github.com/profile-icons/readme-repo-pins/blob/main/files/themes.json)
 * (optional) background imagery - URL or filepath
-* (optional) user contribution statistics 
-* (optional) i18n translations (using [optimum/m2m100_418M](https://huggingface.co/optimum/m2m100_418M) and [TigreGotico/nllb-200-distilled-600M-onnx](https://huggingface.co/TigreGotico/nllb-200-distilled-600M-onnx))
+* (optional) user contribution statistics
+* (optional) i18n translations (using [tencent/Hy-MT2-1.8B-GGUF](https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF) and [TigreGotico/nllb-200-distilled-600M-onnx](https://huggingface.co/TigreGotico/nllb-200-distilled-600M-onnx))
 
 Pins for private repositories automatically link to deployed public Pages if the link is set to the repository.
 
@@ -34,7 +34,7 @@ jobs:
   update-pins:
     runs-on: ubuntu-latest
     steps:
-      - uses: profile-icons/github-profile-repo-pins@v1
+      - uses: profile-icons/github-profile-repo-pins@main
         with:
           gh_api_token: ${{ secrets.GH_API_TOKEN || secrets.GITHUB_TOKEN }}  # default fallback
           gh_username: ${{ secrets.GH_USERNAME || github.repository_owner }}  # default fallback
@@ -47,7 +47,6 @@ jobs:
           is_exclude_repos_contributed: ${{ secrets.IS_EXCLUDE_REPOS_CONTRIBUTED }}  # optional
           is_contribution_stats: ${{ secrets.IS_CONTRIBUTION_STATS }}  # optional
           is_i18n: ${{ secrets.IS_TRANSLATE }}  # optional
-          is_nllb: ${{ secrets.IS_NLLB }}  # optional
           hf_token: ${{ secrets.HF_TOKEN }}  # optional
 ```
 
@@ -62,14 +61,14 @@ Insert the following placeholder into the repository profile `README.md` where y
 
 ## Configurations (optional)
 
-The repository project was initially created to streamline the display of generated pin visualizations on a 
+The repository project was initially created to streamline the display of generated pin visualizations on a
 private profile `README.md`, but supports broader use cases with optional personalization and elevation of API privileges.
 
 <details>
 <summary>API Token</summary>
 
 The optional `GH_API_TOKEN` configuration is for elevating GitHub GraphQL API privileges with a [personal access token (PAT)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
-The default [rate limit](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api) when not using a GitHub PAT is 1000 query points per hour and is limited to public repository data. 
+The default [rate limit](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api) when not using a GitHub PAT is 1000 query points per hour and is limited to public repository data.
 The rate limit when using a PAT is increased to 5000, and provides access to authorized private repository data so that pins can be generated for both
 public and private repositories to both public and private profiles.
 
@@ -112,8 +111,8 @@ The optional `THEME` configuration controls the visual color scheme of the gener
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 * key: `THEME`
 * value (either one of the two formats):
-  * `{<owner/repo>: <theme_name>,...,<owner/repo>: <theme_name>}` - individual pin theme(s)
-  * `<theme_name>` - single theme for pin(s)
+    * `{<owner/repo>: <theme_name>,...,<owner/repo>: <theme_name>}` - individual pin theme(s)
+    * `<theme_name>` - single theme for pin(s)
 
 where:
 * `owner/repo` matches the owner/repository names in the URL of a given repository - required `<>`
@@ -168,9 +167,9 @@ The optional `BG_IMG` configuration controls the embedding of select imagery to 
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 * key: `BG_IMG`
 * value (either one of the three formats):
-  * `{<owner/repo>: <img-config-dict>,...,<owner/repo>: <img-config-dict>}` - individual pin background image(s)
-  * `<img-config-dict>` - single background image for pin(s)
-  * `<url/filepath>` - single background image for pin(s)
+    * `{<owner/repo>: <img-config-dict>,...,<owner/repo>: <img-config-dict>}` - individual pin background image(s)
+    * `<img-config-dict>` - single background image for pin(s)
+    * `<url/filepath>` - single background image for pin(s)
 
 where:
 * `owner/repo` matches the owner/repository names in the URL of a given repository - required `<>`
@@ -253,12 +252,12 @@ This can be set by creating a [GitHub Action](https://docs.github.com/en/actions
 
 where:
 * `order` is optionally any value in:
-  * `stargazers` - the number of stars the repo has
-  * `name` - the repo name
-  * `created_at` - the datetime the repo is initially created
-  * `updated_at` - the datetime the repo is last updated
-  * `pushed_at` - the datetime the repo is last pushed to
-  * `random` - any random order
+    * `stargazers` - the number of stars the repo has
+    * `name` - the repo name
+    * `created_at` - the datetime the repo is initially created
+    * `updated_at` - the datetime the repo is last updated
+    * `pushed_at` - the datetime the repo is last pushed to
+    * `random` - any random order
 
 > The default `REPO_PIN_ORDER` is `STARGAZERS`
 
@@ -331,8 +330,8 @@ where:
 <details>
 <summary>Contribution Stats</summary>
 
-The optional `IS_CONTRIBUTION_STATS` configuration controls whether a (user) contribution percentage is appended to 
-the repository contributor count in the pin footer, enclosed in parentheses, such as: ![ICON](https://raw.githubusercontent.com/primer/octicons/refs/heads/main/icons/people-16.svg) 22 (99.9%).
+The optional `IS_CONTRIBUTION_STATS` configuration controls whether a (user) contribution percentage is appended to
+the repository contributor count in the pin footer, and when more than two, includes weighted percentage in parentheses.
 
 This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
 
@@ -362,24 +361,6 @@ where:
 </details>
 
 <details>
-<summary>NLLB Model</summary>
-
-The optional `IS_NLLB` configuration controls whether a larger NLLB model is used for i18n translations not supported
-by a faster M2M mode.
-
-This can be set by creating a [GitHub Action](https://docs.github.com/en/actions) with the following key-value field pairs:
-
-* key: `IS_NLLB`
-* value: `[is_nllb]`
-
-where:
-* `is_nllb` is either `true` (any value) or `false` (empty) - optional `[]`
-
-> The default `IS_NLLB` is `false`
-</details>
-
-
-<details>
 <summary>Huggingface Token</summary>
 
 The optional `HF_TOKEN` configuration authenticates requests for faster downloading with higher rate limits.
@@ -395,24 +376,23 @@ where:
 
 ## Local Development
 
-### Install
+### Build
 
 ```bash
-pip install -e ".[dev]"
+cargo build --release --locked
 ```
 
-### Test
-
-Test themes, backgrounds and SVG rendering. Images are saved to `repo_pin_imgs/`
+### i18n
 
 ```bash
-python -m gh_profile_repo_pins.repo_pins_img.repo_pins_img_svg [OPTIONS]
+bash scripts/setup-onnx.sh
+export ORT_DYLIB_PATH="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/repo-pins-onnx/onnxruntime-linux-x64-1.22.0/lib/libonnxruntime.so.1.22.0"
 ```
 
 ### Run
 
 ```bash
-python gh_profile_repo_pins.py [OPTIONS]
+cargo run --release --locked -- [OPTIONS]
 ```
 
 ## Contribute
@@ -420,5 +400,6 @@ python gh_profile_repo_pins.py [OPTIONS]
 Before making a Pull Request, ensure it addresses an Issue, and verify the branch passes:
 
 ```bash
-code-verify
+cargo fmt --all
+cargo clippy --locked --all-targets --all-features -- -D warnings
 ```

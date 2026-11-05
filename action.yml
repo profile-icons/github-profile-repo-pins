@@ -1,5 +1,5 @@
 name: "GitHub Profile Repo Pins"
-description: "Design & display any public & private repo pins for GitHub user & organization profiles with auto-translations, images, themes, dynamic ordering & optional stats support."
+description: "Generate configurable public/private repository pin visualizations for GitHub user & organization profiles."
 author: "profile-icons"
 
 branding:
@@ -40,9 +40,6 @@ inputs:
   is_i18n:
     description: "Support repository pin badge and description text translations for multiple i18n locales."
     required: false
-  is_nllb:
-    description: "Use a larger NLLB model for i18n translations not supported by a faster model. True of False (empty)."
-    required: false
   hf_token:
     description: "HuggingFace token to authenticate requests for faster downloading with higher rate limits."
     required: false
@@ -55,33 +52,48 @@ runs:
       with:
         token: ${{ inputs.gh_api_token }}
         fetch-depth: 0
+        persist-credentials: true
 
     - name: Checkout src
       uses: actions/checkout@v7
       with:
-        repository: profile-icons/readme-repo-pins-src
+        repository: profile-icons/readme-repo-pins
         ref: main
-        path: readme-repo-pins-src
+        path: readme-repo-pins
+        token: ${{ inputs.gh_api_token }}
         fetch-depth: 1
+        persist-credentials: false
 
-    - name: Setup
-      uses: actions/setup-python@v7
-      with:
-        python-version: '3.14'
-
-    - name: Install
+    - name: Setup bin
       shell: bash
+      working-directory: ${{ github.workspace }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/setup-bin.sh" "$GITHUB_WORKSPACE/readme-repo-pins"
+
+    - name: Cache
+      if: ${{ contains(fromJSON('["true","1","yes","on"]'), inputs.is_i18n) }}
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ runner.temp }}/repo-pins-models
+          ${{ runner.temp }}/repo-pins-onnx
+        key: repo-pins-models-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('readme-repo-pins/src/translation/*.rs', 'readme-repo-pins/scripts/setup-onnx.sh') }}
+
+    - name: Setup ONNX
+      shell: bash
+      working-directory: ${{ github.workspace }}
       env:
-        PIP_DISABLE_PIP_VERSION_CHECK: '1'
+        IS_TRANSLATE: ${{ inputs.is_i18n }}
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install ./readme-repo-pins-src
+        case "${IS_TRANSLATE,,}" in
+          true|1|yes|on) bash "$REPO_PINS_SRC_DIR/scripts/setup-onnx.sh" ;;
+        esac
 
     - name: Run
       shell: bash
+      working-directory: ${{ github.workspace }}
       env:
         GH_API_TOKEN: ${{ inputs.gh_api_token }}
-        GH_USERNAME: ${{ inputs.gh_username }}
+        GH_USERNAME: ${{ inputs.gh_username || github.repository_owner }}
         GH_REPO_OWNER: ${{ github.repository_owner }}
         GH_REPO_NAME: ${{ github.repository }}
         THEME: ${{ inputs.theme }}
@@ -93,103 +105,18 @@ runs:
         IS_EXCLUDE_REPOS_CONTRIBUTED: ${{ inputs.is_exclude_repos_contributed }}
         IS_CONTRIBUTION_STATS: ${{ inputs.is_contribution_stats }}
         IS_TRANSLATE: ${{ inputs.is_i18n }}
-        IS_NLLB: ${{ inputs.is_nllb }}
         HF_TOKEN: ${{ inputs.hf_token }}
+        REPO_PINS_MODEL_CACHE: ${{ runner.temp }}/repo-pins-models
       run: |
-        python readme-repo-pins-src/gh_profile_repo_pins.py
-
-    - name: Config git
-      shell: bash
-      env:
-        GH_USERNAME: ${{ inputs.gh_username }}
-      run: |
-        set -e
-        : "${GH_USER_NAME:?GH_USER_NAME missing}"; : "${GH_USER_ID:?GH_USER_ID missing}"
-        git config user.name "$GH_USER_NAME"
-        git config user.email "${GH_USER_ID}+${GH_USERNAME}@users.noreply.github.com"
-
-    - name: Save changes
-      shell: bash
-      run: |
-        set -e
-        git diff -- README.md profile/README.md > "$RUNNER_TEMP/readme.patch"
-
-        rm -rf "$RUNNER_TEMP/repo_pin_imgs"
-        mkdir -p "$RUNNER_TEMP/repo_pin_imgs"
-        if [ -d repo_pin_imgs ]; then
-          cp -a repo_pin_imgs/. "$RUNNER_TEMP/repo_pin_imgs/"
-        fi
-
-        for file in README.md profile/README.md; do
-          if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-            git restore -- "$file"
-          fi
+        for variable in NUM_REPO_PINS REPO_PIN_ORDER; do
+          if [[ -z "${!variable}" ]]; then unset "$variable"; fi
         done
-        git restore --staged --worktree -- repo_pin_imgs 2>/dev/null || true
-        git clean -fd -- repo_pin_imgs
+        "$REPO_PINS_BIN" --themes "$REPO_PINS_SRC_DIR/files/themes.json"
 
-    - name: Checkout generated
+    - name: Commit
       shell: bash
-      run: |
-        set -e
-        git pull
-        git checkout generated || git checkout -b generated
-
-    - name: Commit generated
-      shell: bash
-      run: |
-        set -e
-        rm -rf repo_pin_imgs
-        mkdir -p repo_pin_imgs
-        cp -a "$RUNNER_TEMP/repo_pin_imgs/." repo_pin_imgs/
-
-        git add -A -- repo_pin_imgs
-        if ! git diff --cached --quiet; then
-          git commit -m "Auto-update profile repo pins" || true
-          git push --set-upstream origin generated
-        else
-          echo "No changes to commit."
-        fi
-
-    - name: Checkout main
-      shell: bash
+      working-directory: ${{ github.workspace }}
       env:
+        GH_USERNAME: ${{ inputs.gh_username || github.repository_owner }}
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      run: |
-        set -e
-        git checkout "$DEFAULT_BRANCH"
-        git pull --rebase origin "$DEFAULT_BRANCH"
-
-        if [ -s "$RUNNER_TEMP/readme.patch" ]; then
-          git apply "$RUNNER_TEMP/readme.patch"
-        else
-          echo "README patch is empty."
-        fi
-
-    - name: Commit main
-      shell: bash
-      env:
-        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      run: |
-        set -e
-        for file in README.md profile/README.md; do
-          if [ -f "$file" ]; then
-            git add -- "$file"
-          fi
-        done
-
-        if ! git diff --cached --quiet; then
-          git commit -m "Update README.md"
-          for attempt in 1 2 3; do
-            if git push origin "$DEFAULT_BRANCH"; then
-              exit 0
-            fi
-            echo "Push failed #$attempt"
-            git pull --rebase origin "$DEFAULT_BRANCH"
-            sleep $(((RANDOM % 8) + 3))
-          done
-          echo "Push failed after retries" >&2
-          exit 1
-        else
-          echo "No changes to commit."
-        fi
+      run: bash "$REPO_PINS_SRC_DIR/scripts/commit.sh"

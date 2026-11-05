@@ -9,15 +9,103 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            platform: linux-x64
+          - runner: ubuntu-26.04-arm
+            platform: linux-arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Run
-        run: code-verify
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: repo-pins-${{ matrix.runner }}-${{ matrix.platform }}
+
+      - name: Verify
+        run: |
+          cargo +stable fmt --all -- --check
+          cargo +stable clippy --locked --all-targets --all-features -- -D warnings
+          cargo +stable check --locked --no-default-features
+          cargo +stable build --locked --release
+
+      - name: Package
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          target/release/gh-profile-repo-pins --help >/dev/null
+          package_dir="$(mktemp -d)"
+          trap 'rm -rf -- "$package_dir"' EXIT
+          install -m 755 target/release/gh-profile-repo-pins "$package_dir/gh-profile-repo-pins"
+          printf '%s\n' "$GITHUB_SHA" > "$package_dir/SOURCE_COMMIT"
+          mkdir -p dist
+          asset="gh-profile-repo-pins-$PLATFORM.tar.gz"
+          tar --create --gzip --file "dist/$asset" --directory "$package_dir" gh-profile-repo-pins SOURCE_COMMIT
+          (cd dist && sha256sum "$asset" > "$asset.sha256")
+
+      - name: Upload
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: repo-pins-binary-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-binary:
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    needs: verify
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    concurrency:
+      group: repo-pins-binary-${{ github.sha }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v8
+        with:
+          pattern: repo-pins-binary-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish binaries
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd dist
+          sha256sum --check --strict gh-profile-repo-pins-linux-x64.tar.gz.sha256 gh-profile-repo-pins-linux-arm64.tar.gz.sha256
+          tag="binary-$GITHUB_SHA"
+          state="$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || printf missing)"
+          if [[ "$state" == false ]]; then
+            printf 'Binary release %s is already published.\n' "$tag"
+            exit 0
+          fi
+          if [[ "$state" == missing ]]; then
+            gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --latest=false \
+              --title "Action binaries $GITHUB_SHA" \
+              --notes "Verified Linux x64 and ARM64 binaries for source commit $GITHUB_SHA."
+          fi
+          gh release upload "$tag" ./*.tar.gz ./*.sha256 --clobber
+          gh release edit "$tag" --draft=false --latest=false
