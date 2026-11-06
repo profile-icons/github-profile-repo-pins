@@ -32,7 +32,8 @@ permissions:
 
 jobs:
   update-pins:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
+
     steps:
       - uses: profile-icons/github-profile-repo-pins@main
         with:
